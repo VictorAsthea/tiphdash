@@ -19,7 +19,7 @@ export default function ConfigPage() {
   const [configs, setConfigs] = useState<Config[]>([])
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState<Record<string, number>>({})
-  const { theme, toggleTheme } = useTheme()
+  const { theme, toggleTheme, mounted } = useTheme()
 
   useEffect(() => {
     loadData()
@@ -124,12 +124,19 @@ export default function ConfigPage() {
                 Basculer entre le thème clair et sombre
               </p>
             </div>
-            <Button
-              variant={theme === 'dark' ? 'default' : 'outline'}
-              onClick={toggleTheme}
-            >
-              {theme === 'dark' ? '🌙 Sombre' : '☀️ Clair'}
-            </Button>
+            {mounted ? (
+              <Button
+                variant={theme === 'dark' ? 'default' : 'outline'}
+                onClick={toggleTheme}
+                className="min-w-[120px]"
+              >
+                {theme === 'dark' ? '🌙 Sombre' : '☀️ Clair'}
+              </Button>
+            ) : (
+              <Button variant="outline" disabled className="min-w-[120px]">
+                Chargement...
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
