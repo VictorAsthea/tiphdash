@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { useTheme } from '@/lib/use-theme'
 
 type Config = {
   id: string
@@ -18,6 +19,7 @@ export default function ConfigPage() {
   const [configs, setConfigs] = useState<Config[]>([])
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState<Record<string, number>>({})
+  const { theme, toggleTheme } = useTheme()
 
   useEffect(() => {
     loadData()
@@ -105,6 +107,30 @@ export default function ConfigPage() {
               </Button>
             </>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Mode sombre */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Apparence</CardTitle>
+          <CardDescription>Personnalisez l'apparence de l'application</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Mode sombre</p>
+              <p className="text-sm text-muted-foreground">
+                Basculer entre le thème clair et sombre
+              </p>
+            </div>
+            <Button
+              variant={theme === 'dark' ? 'default' : 'outline'}
+              onClick={toggleTheme}
+            >
+              {theme === 'dark' ? '🌙 Sombre' : '☀️ Clair'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
