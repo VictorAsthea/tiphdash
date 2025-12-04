@@ -295,6 +295,56 @@ export default function MandatsPage() {
     })
   }
 
+  // Export CSV
+  const handleExportCSV = () => {
+    // Créer les en-têtes CSV
+    const headers = [
+      'Statut', 'N° Mandat', 'Typologie', 'Vendeur', 'Date Signature',
+      'Bien', 'Adresse', 'Acquéreur', 'Date Compromis', 'Date Réitération',
+      'Honoraires Agence HT', 'Honoraires Moi HT', 'TVA', 'Commission TTC',
+      'Urssaf', 'Commission Nette'
+    ]
+
+    // Créer les lignes CSV
+    const rows = mandatsFilteres.map(m => [
+      getStatutLabel(m.statut),
+      m.numero_mandat,
+      m.typologie,
+      m.vendeur,
+      formatDate(m.date_signature),
+      m.bien,
+      m.adresse,
+      m.acquireur || '',
+      formatDate(m.date_compromis),
+      formatDate(m.date_reiteration_prevue),
+      m.honoraires_agence_ht,
+      m.honoraires_moi_ht,
+      m.tva,
+      m.commission_ttc,
+      m.urssaf,
+      m.commission_nette
+    ])
+
+    // Combiner en CSV
+    const csv = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell =>
+        typeof cell === 'string' && cell.includes(',') ? `"${cell}"` : cell
+      ).join(','))
+    ].join('\n')
+
+    // Télécharger le fichier
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `mandats_${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   const getStatutBadgeClass = (statut: string) => {
     switch (statut) {
       case 'vendu':
@@ -351,7 +401,12 @@ export default function MandatsPage() {
           <h1 className="text-3xl font-bold text-primary">Gestion des Mandats</h1>
           <p className="text-muted-foreground">Liste de tous vos mandats</p>
         </div>
-        <Button onClick={() => setIsAdding(true)}>Ajouter un mandat</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCSV}>
+            Exporter CSV
+          </Button>
+          <Button onClick={() => setIsAdding(true)}>Ajouter un mandat</Button>
+        </div>
       </div>
 
       {/* Alertes */}
