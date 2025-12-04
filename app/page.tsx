@@ -129,6 +129,9 @@ export default function DashboardPage() {
     .filter(m => m.statut === 'vendu')
     .reduce((sum, m) => sum + m.commission_nette, 0)
 
+  // URSSAF total (CA Brut - CA Net)
+  const urssafTotal = caBrut - caNet
+
   // CA Potentiel (honoraires HT des mandats potentiels)
   const caPotentiel = mandats
     .filter(m => m.statut === 'potentiel')
@@ -329,12 +332,16 @@ export default function DashboardPage() {
               {caNet.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
             </div>
             <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
+              <div className="flex justify-between p-2 bg-white/50 dark:bg-white/5 rounded">
                 <span className="text-muted-foreground">CA Brut</span>
-                <span>{caBrut.toLocaleString('fr-FR')} €</span>
+                <span className="font-semibold">{caBrut.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
               </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Taux de marge</span>
+              <div className="flex justify-between p-2 bg-red-50/80 dark:bg-red-900/10 rounded">
+                <span className="text-muted-foreground">- URSSAF + PL</span>
+                <span className="font-semibold text-red-600 dark:text-red-400">{urssafTotal.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground pt-1">
+                <span>Taux de marge net</span>
                 <span>{caBrut > 0 ? ((caNet / caBrut) * 100).toFixed(1) : 0}%</span>
               </div>
             </div>

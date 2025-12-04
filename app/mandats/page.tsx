@@ -182,6 +182,11 @@ export default function MandatsPage() {
     const mandatData = {
       ...formData,
       ...commissions,
+      numero_mandat: formData.numero_mandat || null,
+      vendeur: formData.vendeur || null,
+      bien: formData.bien || null,
+      adresse: formData.adresse || null,
+      date_signature: formData.date_signature || null,
       acquireur: formData.acquireur || null,
       date_compromis: formData.date_compromis || null,
       date_reiteration_prevue: formData.date_reiteration_prevue || null,
@@ -511,7 +516,6 @@ export default function MandatsPage() {
                   id="numero_mandat"
                   value={formData.numero_mandat}
                   onChange={(e) => setFormData({ ...formData, numero_mandat: e.target.value })}
-                  required
                 />
               </div>
 
@@ -536,7 +540,6 @@ export default function MandatsPage() {
                   id="vendeur"
                   value={formData.vendeur}
                   onChange={(e) => setFormData({ ...formData, vendeur: e.target.value })}
-                  required
                 />
               </div>
 
@@ -547,7 +550,6 @@ export default function MandatsPage() {
                   type="date"
                   value={formData.date_signature}
                   onChange={(e) => setFormData({ ...formData, date_signature: e.target.value })}
-                  required
                 />
               </div>
 
@@ -557,7 +559,6 @@ export default function MandatsPage() {
                   id="bien"
                   value={formData.bien}
                   onChange={(e) => setFormData({ ...formData, bien: e.target.value })}
-                  required
                 />
               </div>
 
@@ -567,7 +568,6 @@ export default function MandatsPage() {
                   id="adresse"
                   value={formData.adresse}
                   onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
-                  required
                 />
               </div>
 
@@ -620,7 +620,6 @@ export default function MandatsPage() {
                   step="0.01"
                   value={formData.honoraires_moi_ht}
                   onChange={(e) => setFormData({ ...formData, honoraires_moi_ht: parseFloat(e.target.value) || 0 })}
-                  required
                 />
               </div>
             </div>
