@@ -54,6 +54,11 @@ export default function MandatsPage() {
   const [expandedMandatId, setExpandedMandatId] = useState<string | null>(null)
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+
+  // États pour la recherche et les filtres
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterStatut, setFilterStatut] = useState<string>('tous')
+  const [filterTypologie, setFilterTypologie] = useState<string>('tous')
   const [formData, setFormData] = useState<{
     statut: 'en_cours' | 'vendu' | 'annule' | 'potentiel'
     numero_mandat: string
@@ -254,6 +259,25 @@ export default function MandatsPage() {
     setExpandedMandatId(expandedMandatId === mandatId ? null : mandatId)
   }
 
+  // Filtrer les mandats en fonction de la recherche et des filtres
+  const mandatsFilteres = mandats.filter(mandat => {
+    // Filtre de recherche
+    const matchSearch = searchTerm === '' ||
+      mandat.numero_mandat.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mandat.vendeur.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mandat.bien.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mandat.adresse.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (mandat.acquireur && mandat.acquireur.toLowerCase().includes(searchTerm.toLowerCase()))
+
+    // Filtre de statut
+    const matchStatut = filterStatut === 'tous' || mandat.statut === filterStatut
+
+    // Filtre de typologie
+    const matchTypologie = filterTypologie === 'tous' || mandat.typologie === filterTypologie
+
+    return matchSearch && matchStatut && matchTypologie
+  })
+
   const resetForm = () => {
     setFormData({
       statut: 'en_cours',
@@ -315,6 +339,56 @@ export default function MandatsPage() {
         </div>
         <Button onClick={() => setIsAdding(true)}>Ajouter un mandat</Button>
       </div>
+
+      {/* Barre de recherche et filtres */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="md:col-span-2 space-y-2">
+              <Label htmlFor="search">Rechercher</Label>
+              <Input
+                id="search"
+                placeholder="N° mandat, vendeur, bien, adresse, acquéreur..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="filter-statut">Statut</Label>
+              <Select value={filterStatut} onValueChange={setFilterStatut}>
+                <SelectTrigger id="filter-statut">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tous">Tous</SelectItem>
+                  <SelectItem value="en_cours">En cours</SelectItem>
+                  <SelectItem value="vendu">Vendu</SelectItem>
+                  <SelectItem value="potentiel">Potentiel</SelectItem>
+                  <SelectItem value="annule">Annulé</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="filter-typologie">Typologie</Label>
+              <Select value={filterTypologie} onValueChange={setFilterTypologie}>
+                <SelectTrigger id="filter-typologie">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tous">Tous</SelectItem>
+                  <SelectItem value="exclusif">Exclusif</SelectItem>
+                  <SelectItem value="semi_exclusif">Semi-exclusif</SelectItem>
+                  <SelectItem value="co_exclusif">Co-exclusif</SelectItem>
+                  <SelectItem value="simple">Simple</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="mt-4 text-sm text-muted-foreground">
+            {mandatsFilteres.length} mandat{mandatsFilteres.length > 1 ? 's' : ''} trouvé{mandatsFilteres.length > 1 ? 's' : ''}
+          </div>
+        </CardContent>
+      </Card>
 
       {isAdding && (
         <Card>
@@ -503,7 +577,7 @@ export default function MandatsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  mandats.map((mandat) => (
+                  mandatsFilteres.map((mandat) => (
                     <>
                       <TableRow
                         key={mandat.id}
