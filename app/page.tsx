@@ -390,27 +390,31 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <span>🧾</span>
-              Impôt Annuel Estimé
+              Impôt sur le Revenu (IR) - Estimation
             </CardTitle>
-            <CardDescription>Rappel de la douloureuse (estimation {TAUX_IMPOT_ESTIME}%)</CardDescription>
+            <CardDescription>Calculé sur votre CA Net après URSSAF</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-5xl font-bold text-red-600 mb-4">
               {impotAnnuelEstime.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between p-2 bg-white rounded text-sm">
-                <span className="text-muted-foreground">Par mois</span>
-                <span className="font-semibold">{(impotAnnuelEstime / 12).toLocaleString('fr-FR')} €</span>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between p-2 bg-white/70 dark:bg-white/5 rounded">
+                <span className="text-muted-foreground">CA Net annuel (après URSSAF)</span>
+                <span className="font-semibold">{caNet.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
               </div>
-              <div className="flex justify-between p-2 bg-white rounded text-sm">
-                <span className="text-muted-foreground">% du CA Net</span>
-                <span className="font-semibold">{TAUX_IMPOT_ESTIME}%</span>
+              <div className="flex justify-between p-2 bg-red-50/80 dark:bg-red-900/10 rounded">
+                <span className="text-muted-foreground">× Taux d'imposition estimé</span>
+                <span className="font-semibold text-red-600 dark:text-red-400">{TAUX_IMPOT_ESTIME}%</span>
               </div>
-              <div className="flex justify-between p-2 bg-white rounded text-sm">
-                <span className="text-muted-foreground">Basé sur CA Net</span>
-                <span className="font-semibold">{caNet.toLocaleString('fr-FR')} €</span>
+              <div className="h-px bg-border my-2"></div>
+              <div className="flex justify-between p-2 bg-blue-50/80 dark:bg-blue-900/10 rounded">
+                <span className="text-muted-foreground font-medium">Impôt mensuel estimé</span>
+                <span className="font-bold text-blue-600 dark:text-blue-400">{(impotAnnuelEstime / 12).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €/mois</span>
               </div>
+              <p className="text-xs text-muted-foreground mt-3 italic">
+                ⚠️ Estimation indicative - Le taux réel dépend de votre situation fiscale (parts, revenus du foyer, etc.)
+              </p>
             </div>
           </CardContent>
         </Card>
