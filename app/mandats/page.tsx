@@ -384,8 +384,8 @@ export default function MandatsPage() {
   const isDateReitProche = (dateReiteration: string | null) => {
     if (!dateReiteration) return false
     const date = new Date(dateReiteration)
-    const aujourd'hui = new Date()
-    const diffJours = Math.ceil((date.getTime() - aujourd'hui.getTime()) / (1000 * 60 * 60 * 24))
+    const aujourdhui = new Date()
+    const diffJours = Math.ceil((date.getTime() - aujourdhui.getTime()) / (1000 * 60 * 60 * 24))
     return diffJours >= 0 && diffJours <= 7
   }
 
