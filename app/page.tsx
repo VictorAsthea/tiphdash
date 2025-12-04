@@ -77,14 +77,9 @@ export default function DashboardPage() {
 
       const tauxURSSAF = config['taux_urssaf_pl'] || 26.8
 
-      // Recalculer les commissions pour les mandats en_cours et potentiel
+      // Recalculer TOUTES les commissions avec le taux URSSAF actuel pour l'affichage
+      // (les valeurs en base gardent les taux figés pour l'historique)
       const mandatsRecalcules = mandatsData.map(mandat => {
-        // Si le mandat est vendu, utiliser les taux figés (pas de recalcul)
-        if (mandat.statut === 'vendu' && mandat.taux_urssaf_fige) {
-          return mandat
-        }
-
-        // Sinon, recalculer avec les taux actuels
         const urssaf = mandat.honoraires_moi_ht * (tauxURSSAF / 100)
         const commissionNette = mandat.honoraires_moi_ht - urssaf
 
