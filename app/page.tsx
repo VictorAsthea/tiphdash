@@ -140,10 +140,14 @@ export default function DashboardPage() {
   // Salaire mensuel net estimé = Total commission nette / 12
   const salaireMensuelNetEstime = caNet / 12
 
-  // Impôt annuel calculé automatiquement (environ 30% du CA Net pour estimation)
-  // AJUSTEZ CE TAUX selon votre situation fiscale réelle
-  const TAUX_IMPOT_ESTIME = 30 // en pourcentage
-  const impotAnnuelEstime = caNet * (TAUX_IMPOT_ESTIME / 100)
+  // URSSAF estimé sur les mandats en cours et potentiels
+  const caBrutEnCoursPotentiel = mandats
+    .filter(m => m.statut === 'en_cours' || m.statut === 'potentiel')
+    .reduce((sum, m) => sum + m.honoraires_moi_ht, 0)
+
+  const urssafEstimeEnCoursPotentiel = caBrutEnCoursPotentiel - mandats
+    .filter(m => m.statut === 'en_cours' || m.statut === 'potentiel')
+    .reduce((sum, m) => sum + m.commission_nette, 0)
 
   // Données pour le graphique d'évolution mensuelle du CA
   const monthlyData = React.useMemo(() => {
@@ -386,34 +390,34 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-red-200 bg-gradient-to-br from-red-50/50 to-transparent">
+        <Card className="border-2 border-orange-200 bg-gradient-to-br from-orange-50/50 to-transparent">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <span>🧾</span>
-              Impôt sur le Revenu (IR) - Estimation
+              <span>📊</span>
+              URSSAF à prévoir (En cours + Potentiel)
             </CardTitle>
-            <CardDescription>Calculé sur votre CA Net après URSSAF</CardDescription>
+            <CardDescription>Estimation sur les mandats non vendus</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-5xl font-bold text-red-600 mb-4">
-              {impotAnnuelEstime.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+            <div className="text-5xl font-bold text-orange-600 mb-4">
+              {urssafEstimeEnCoursPotentiel.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between p-2 bg-white/70 dark:bg-white/5 rounded">
-                <span className="text-muted-foreground">CA Net annuel (après URSSAF)</span>
-                <span className="font-semibold">{caNet.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                <span className="text-muted-foreground">CA Brut (En cours + Potentiel)</span>
+                <span className="font-semibold">{caBrutEnCoursPotentiel.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
               </div>
-              <div className="flex justify-between p-2 bg-red-50/80 dark:bg-red-900/10 rounded">
-                <span className="text-muted-foreground">× Taux d'imposition estimé</span>
-                <span className="font-semibold text-red-600 dark:text-red-400">{TAUX_IMPOT_ESTIME}%</span>
+              <div className="flex justify-between p-2 bg-orange-50/80 dark:bg-orange-900/10 rounded">
+                <span className="text-muted-foreground">URSSAF estimé à payer</span>
+                <span className="font-semibold text-orange-600 dark:text-orange-400">{urssafEstimeEnCoursPotentiel.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
               </div>
               <div className="h-px bg-border my-2"></div>
               <div className="flex justify-between p-2 bg-blue-50/80 dark:bg-blue-900/10 rounded">
-                <span className="text-muted-foreground font-medium">Impôt mensuel estimé</span>
-                <span className="font-bold text-blue-600 dark:text-blue-400">{(impotAnnuelEstime / 12).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €/mois</span>
+                <span className="text-muted-foreground font-medium">CA Net potentiel</span>
+                <span className="font-bold text-blue-600 dark:text-blue-400">{(caBrutEnCoursPotentiel - urssafEstimeEnCoursPotentiel).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
               </div>
               <p className="text-xs text-muted-foreground mt-3 italic">
-                ⚠️ Estimation indicative - Le taux réel dépend de votre situation fiscale (parts, revenus du foyer, etc.)
+                💡 Calculé avec le taux URSSAF actuel de la configuration
               </p>
             </div>
           </CardContent>
