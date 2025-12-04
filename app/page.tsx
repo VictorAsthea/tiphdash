@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 type ProjectionCA = {
   id: string
@@ -21,6 +22,8 @@ type Mandat = {
   commission_nette: number
   taux_tva_fige: number | null
   taux_urssaf_fige: number | null
+  date_signature: string
+  date_compromis: string | null
 }
 
 export default function DashboardPage() {
@@ -57,7 +60,7 @@ export default function DashboardPage() {
     // Charger les mandats
     const { data: mandatsData } = await supabase
       .from('mandats')
-      .select('id, statut, honoraires_moi_ht, commission_nette, taux_tva_fige, taux_urssaf_fige')
+      .select('id, statut, honoraires_moi_ht, commission_nette, taux_tva_fige, taux_urssaf_fige, date_signature, date_compromis')
 
     if (mandatsData) {
       // Charger les taux actuels pour recalculer les mandats en_cours et potentiel
@@ -144,6 +147,43 @@ export default function DashboardPage() {
   const TAUX_IMPOT_ESTIME = 30 // en pourcentage
   const impotAnnuelEstime = caNet * (TAUX_IMPOT_ESTIME / 100)
 
+  // Données pour le graphique d'évolution mensuelle du CA
+  const monthlyData = React.useMemo(() => {
+    const months = [
+      'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+      'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'
+    ]
+
+    const data = months.map((month, index) => {
+      const mandatsDuMois = mandats.filter(m => {
+        if (m.statut !== 'vendu' || !m.date_compromis) return false
+        const date = new Date(m.date_compromis)
+        return date.getMonth() === index && date.getFullYear() === formData.year
+      })
+
+      const caMois = mandatsDuMois.reduce((sum, m) => sum + m.honoraires_moi_ht, 0)
+      const caNetMois = mandatsDuMois.reduce((sum, m) => sum + m.commission_nette, 0)
+
+      return {
+        mois: month,
+        'CA Brut': Math.round(caMois),
+        'CA Net': Math.round(caNetMois),
+      }
+    })
+
+    return data
+  }, [mandats, formData.year])
+
+  // Données pour le graphique objectif vs réalisé
+  const objectifData = [
+    {
+      name: 'CA Annuel',
+      'Objectif': projection?.objectif || 0,
+      'Réalisé': Math.round(caBrut),
+      'Potentiel': Math.round(caPotentiel),
+    }
+  ]
+
   return (
     <div className="space-y-6">
       <div>
@@ -194,6 +234,56 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-5xl font-bold text-yellow-600">{mandatsPotentiels}</div>
             <p className="text-xs text-muted-foreground mt-2">À développer</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Graphiques d'évolution */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Graphique courbe - Évolution mensuelle du CA */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Évolution mensuelle du CA</CardTitle>
+            <CardDescription>CA Brut et Net par mois en {formData.year}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="mois" />
+                <YAxis />
+                <Tooltip
+                  formatter={(value) => `${Number(value).toLocaleString('fr-FR')} €`}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="CA Brut" stroke="hsl(var(--primary))" strokeWidth={2} />
+                <Line type="monotone" dataKey="CA Net" stroke="hsl(142, 76%, 36%)" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Graphique barres - Objectif vs Réalisé */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Objectif vs Réalisé</CardTitle>
+            <CardDescription>Comparaison annuelle</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={objectifData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip
+                  formatter={(value) => `${Number(value).toLocaleString('fr-FR')} €`}
+                />
+                <Legend />
+                <Bar dataKey="Objectif" fill="hsl(var(--primary))" />
+                <Bar dataKey="Réalisé" fill="hsl(142, 76%, 36%)" />
+                <Bar dataKey="Potentiel" fill="hsl(48, 96%, 53%)" />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
