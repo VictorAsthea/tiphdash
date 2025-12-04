@@ -1,65 +1,375 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+
+type ProjectionCA = {
+  id: string
+  year: number
+  objectif: number
+  impot_annuel: number
+}
+
+type Mandat = {
+  id: string
+  statut: 'en_cours' | 'vendu' | 'annule' | 'potentiel'
+  honoraires_moi_ht: number
+  commission_nette: number
+  taux_tva_fige: number | null
+  taux_urssaf_fige: number | null
+}
+
+export default function DashboardPage() {
+  const [projection, setProjection] = useState<ProjectionCA | null>(null)
+  const [mandats, setMandats] = useState<Mandat[]>([])
+  const [isEditingObjectif, setIsEditingObjectif] = useState(false)
+  const [formData, setFormData] = useState({
+    year: new Date().getFullYear(),
+    objectif: 0,
+  })
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    const currentYear = new Date().getFullYear()
+
+    // Charger la projection de l'année en cours
+    const { data: projectionData } = await supabase
+      .from('projections_ca')
+      .select('*')
+      .eq('year', currentYear)
+      .single()
+
+    if (projectionData) {
+      setProjection(projectionData)
+      setFormData({
+        year: projectionData.year,
+        objectif: projectionData.objectif,
+      })
+    }
+
+    // Charger les mandats
+    const { data: mandatsData } = await supabase
+      .from('mandats')
+      .select('id, statut, honoraires_moi_ht, commission_nette, taux_tva_fige, taux_urssaf_fige')
+
+    if (mandatsData) {
+      // Charger les taux actuels pour recalculer les mandats en_cours et potentiel
+      const { data: configData } = await supabase
+        .from('config')
+        .select('key, value')
+
+      const config: Record<string, number> = {}
+      if (configData) {
+        configData.forEach(item => {
+          config[item.key] = item.value
+        })
+      }
+
+      const tauxURSSAF = config['taux_urssaf_pl'] || 26.8
+
+      // Recalculer les commissions pour les mandats en_cours et potentiel
+      const mandatsRecalcules = mandatsData.map(mandat => {
+        // Si le mandat est vendu, utiliser les taux figés (pas de recalcul)
+        if (mandat.statut === 'vendu' && mandat.taux_urssaf_fige) {
+          return mandat
+        }
+
+        // Sinon, recalculer avec les taux actuels
+        const urssaf = mandat.honoraires_moi_ht * (tauxURSSAF / 100)
+        const commissionNette = mandat.honoraires_moi_ht - urssaf
+
+        return {
+          ...mandat,
+          commission_nette: commissionNette,
+        }
+      })
+
+      setMandats(mandatsRecalcules)
+    }
+  }
+
+  const handleSaveObjectif = async () => {
+    if (projection) {
+      await supabase
+        .from('projections_ca')
+        .update({ objectif: formData.objectif })
+        .eq('id', projection.id)
+    } else {
+      await supabase
+        .from('projections_ca')
+        .insert([formData])
+    }
+    setIsEditingObjectif(false)
+    loadData()
+  }
+
+  // Statistiques mandats
+  const totalMandats = mandats.length
+  const mandatsVendus = mandats.filter(m => m.statut === 'vendu').length
+  const mandatsEnCours = mandats.filter(m => m.statut === 'en_cours').length
+  const mandatsPotentiels = mandats.filter(m => m.statut === 'potentiel').length
+
+  // CA Brut (honoraires HT des mandats vendus)
+  const caBrut = mandats
+    .filter(m => m.statut === 'vendu')
+    .reduce((sum, m) => sum + m.honoraires_moi_ht, 0)
+
+  // CA Net (commission nette après URSSAF des mandats vendus)
+  const caNet = mandats
+    .filter(m => m.statut === 'vendu')
+    .reduce((sum, m) => sum + m.commission_nette, 0)
+
+  // CA Potentiel (honoraires HT des mandats potentiels)
+  const caPotentiel = mandats
+    .filter(m => m.statut === 'potentiel')
+    .reduce((sum, m) => sum + m.honoraires_moi_ht, 0)
+
+  // Taux de réalisation
+  const tauxRealisation = projection && projection.objectif > 0
+    ? (caBrut / projection.objectif) * 100
+    : 0
+
+  // Salaire mensuel net estimé = Total commission nette / 12
+  const salaireMensuelNetEstime = caNet / 12
+
+  // Impôt annuel calculé automatiquement (environ 30% du CA Net pour estimation)
+  // AJUSTEZ CE TAUX selon votre situation fiscale réelle
+  const TAUX_IMPOT_ESTIME = 30 // en pourcentage
+  const impotAnnuelEstime = caNet * (TAUX_IMPOT_ESTIME / 100)
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-4xl font-bold text-primary">Dashboard {formData.year}</h1>
+        <p className="text-muted-foreground mt-1">Vue d&apos;ensemble de votre activité immobilière</p>
+      </div>
+
+      {/* KPIs Principaux - Grande grille */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardHeader className="pb-3">
+            <CardDescription className="text-xs uppercase tracking-wide">Total Mandats</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-5xl font-bold text-primary">{totalMandats}</div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {mandatsVendus} vendus • {mandatsEnCours} en cours
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-transparent">
+          <CardHeader className="pb-3">
+            <CardDescription className="text-xs uppercase tracking-wide">Mandats Vendus</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-5xl font-bold text-green-600">{mandatsVendus}</div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {mandatsVendus > 0 ? ((mandatsVendus / totalMandats) * 100).toFixed(0) : 0}% du total
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-transparent">
+          <CardHeader className="pb-3">
+            <CardDescription className="text-xs uppercase tracking-wide">En Cours</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-5xl font-bold text-blue-600">{mandatsEnCours}</div>
+            <p className="text-xs text-muted-foreground mt-2">Mandats actifs</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-transparent">
+          <CardHeader className="pb-3">
+            <CardDescription className="text-xs uppercase tracking-wide">Potentiels</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-5xl font-bold text-yellow-600">{mandatsPotentiels}</div>
+            <p className="text-xs text-muted-foreground mt-2">À développer</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* CA Statistics - Cartes plus grandes et stylées */}
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="border-2 border-primary/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">CA Brut</CardTitle>
+            <CardDescription>Honoraires HT vendus</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-4xl font-bold text-primary mb-2">
+              {caBrut.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+            </div>
+            {projection && projection.objectif > 0 && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Objectif</span>
+                  <span className="font-semibold">{projection.objectif.toLocaleString('fr-FR')} €</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="bg-primary h-full rounded-full transition-all"
+                    style={{ width: `${Math.min(tauxRealisation, 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-primary font-bold text-right">
+                  {tauxRealisation.toFixed(1)}% réalisé
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50/50 to-transparent">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">CA Net</CardTitle>
+            <CardDescription>Après Urssaf + PL</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-4xl font-bold text-green-600 mb-2">
+              {caNet.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+            </div>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">CA Brut</span>
+                <span>{caBrut.toLocaleString('fr-FR')} €</span>
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Taux de marge</span>
+                <span>{caBrut > 0 ? ((caNet / caBrut) * 100).toFixed(1) : 0}%</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50/50 to-transparent">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">CA Potentiel</CardTitle>
+            <CardDescription>Mandats potentiels</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-4xl font-bold text-yellow-600 mb-2">
+              {caPotentiel.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {mandatsPotentiels} mandat{mandatsPotentiels > 1 ? 's' : ''} en attente
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Revenus & Fiscalité */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50/50 to-transparent">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span>💰</span>
+              Salaire Mensuel Net Estimé
+            </CardTitle>
+            <CardDescription>Calculé automatiquement</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-5xl font-bold text-purple-600 mb-4">
+              {salaireMensuelNetEstime.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between p-2 bg-white rounded">
+                <span className="text-muted-foreground">CA Net total</span>
+                <span className="font-semibold">{caNet.toLocaleString('fr-FR')} €</span>
+              </div>
+              <div className="flex justify-between p-2 bg-white rounded">
+                <span className="text-muted-foreground">Divisé par</span>
+                <span className="font-semibold">12 mois</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-2 border-red-200 bg-gradient-to-br from-red-50/50 to-transparent">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span>🧾</span>
+              Impôt Annuel Estimé
+            </CardTitle>
+            <CardDescription>Rappel de la douloureuse (estimation {TAUX_IMPOT_ESTIME}%)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-5xl font-bold text-red-600 mb-4">
+              {impotAnnuelEstime.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between p-2 bg-white rounded text-sm">
+                <span className="text-muted-foreground">Par mois</span>
+                <span className="font-semibold">{(impotAnnuelEstime / 12).toLocaleString('fr-FR')} €</span>
+              </div>
+              <div className="flex justify-between p-2 bg-white rounded text-sm">
+                <span className="text-muted-foreground">% du CA Net</span>
+                <span className="font-semibold">{TAUX_IMPOT_ESTIME}%</span>
+              </div>
+              <div className="flex justify-between p-2 bg-white rounded text-sm">
+                <span className="text-muted-foreground">Basé sur CA Net</span>
+                <span className="font-semibold">{caNet.toLocaleString('fr-FR')} €</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Objectif de l'année */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Objectif CA {formData.year}</CardTitle>
+          <CardDescription>Définissez votre cible annuelle</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isEditingObjectif ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="objectif">Objectif de chiffre d&apos;affaires</Label>
+                <Input
+                  id="objectif"
+                  type="number"
+                  step="0.01"
+                  value={formData.objectif}
+                  onChange={(e) => setFormData({ ...formData, objectif: parseFloat(e.target.value) || 0 })}
+                  className="text-lg"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSaveObjectif}>Enregistrer</Button>
+                <Button variant="outline" onClick={() => setIsEditingObjectif(false)}>Annuler</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Objectif annuel</p>
+                  <p className="text-3xl font-bold text-primary">{formData.objectif.toLocaleString('fr-FR')} €</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Restant à réaliser</p>
+                  <p className="text-2xl font-bold text-muted-foreground">
+                    {Math.max(0, formData.objectif - caBrut).toLocaleString('fr-FR')} €
+                  </p>
+                </div>
+              </div>
+              <Button onClick={() => setIsEditingObjectif(true)} variant="outline" className="w-full">
+                Modifier l&apos;objectif
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
-  );
+  )
 }
