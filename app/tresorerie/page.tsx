@@ -36,6 +36,8 @@ export default function TresoreriePage() {
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [typeOperation, setTypeOperation] = useState<'credit' | 'debit'>('credit')
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString())
+  const [selectedMonth, setSelectedMonth] = useState<string>('tous')
   const [formData, setFormData] = useState({
     date_operation: new Date().toISOString().split('T')[0],
     montant: 0,
@@ -149,9 +151,52 @@ export default function TresoreriePage() {
     return montant.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
-  const soldeActuel = transactions.length > 0 ? transactions[transactions.length - 1].solde || 0 : 0
-  const totalCredits = transactions.reduce((sum, t) => sum + t.credit, 0)
-  const totalDebits = transactions.reduce((sum, t) => sum + t.debit, 0)
+  // Filtrer les transactions par année et mois
+  const transactionsFiltrees = transactions.filter(t => {
+    const dateTransaction = new Date(t.date_operation)
+    const yearMatch = dateTransaction.getFullYear().toString() === selectedYear
+
+    if (selectedMonth === 'tous') {
+      return yearMatch
+    }
+
+    const monthMatch = (dateTransaction.getMonth() + 1).toString() === selectedMonth
+    return yearMatch && monthMatch
+  })
+
+  // Recalculer le solde pour les transactions filtrées
+  let soldeCumule = 0
+  const transactionsFiltreesAvecSolde = transactionsFiltrees.map(t => {
+    soldeCumule += t.credit - t.debit
+    return { ...t, solde: soldeCumule }
+  })
+
+  // Obtenir les années disponibles
+  const anneesDisponibles = Array.from(
+    new Set(transactions.map(t => new Date(t.date_operation).getFullYear()))
+  ).sort((a, b) => b - a)
+
+  const moisDisponibles = [
+    { value: 'tous', label: 'Toute l\'année' },
+    { value: '1', label: 'Janvier' },
+    { value: '2', label: 'Février' },
+    { value: '3', label: 'Mars' },
+    { value: '4', label: 'Avril' },
+    { value: '5', label: 'Mai' },
+    { value: '6', label: 'Juin' },
+    { value: '7', label: 'Juillet' },
+    { value: '8', label: 'Août' },
+    { value: '9', label: 'Septembre' },
+    { value: '10', label: 'Octobre' },
+    { value: '11', label: 'Novembre' },
+    { value: '12', label: 'Décembre' },
+  ]
+
+  const soldeActuel = transactionsFiltreesAvecSolde.length > 0
+    ? transactionsFiltreesAvecSolde[transactionsFiltreesAvecSolde.length - 1].solde || 0
+    : 0
+  const totalCredits = transactionsFiltreesAvecSolde.reduce((sum, t) => sum + t.credit, 0)
+  const totalDebits = transactionsFiltreesAvecSolde.reduce((sum, t) => sum + t.debit, 0)
 
   return (
     <div className="space-y-6">
@@ -164,6 +209,59 @@ export default function TresoreriePage() {
           + Nouvelle transaction
         </Button>
       </div>
+
+      {/* Filtres */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtres</CardTitle>
+          <CardDescription>Sélectionnez une période</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Année</Label>
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {anneesDisponibles.length === 0 ? (
+                    <SelectItem value={new Date().getFullYear().toString()}>
+                      {new Date().getFullYear()}
+                    </SelectItem>
+                  ) : (
+                    anneesDisponibles.map(year => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Mois</Label>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {moisDisponibles.map(mois => (
+                    <SelectItem key={mois.value} value={mois.value}>
+                      {mois.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground mt-3">
+            📊 {transactionsFiltreesAvecSolde.length} transaction{transactionsFiltreesAvecSolde.length > 1 ? 's' : ''}
+            {selectedMonth !== 'tous' && ` en ${moisDisponibles.find(m => m.value === selectedMonth)?.label}`} {selectedYear}
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Indicateurs principaux */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -286,7 +384,11 @@ export default function TresoreriePage() {
       <Card>
         <CardHeader>
           <CardTitle>Historique des transactions</CardTitle>
-          <CardDescription>{transactions.length} transaction{transactions.length > 1 ? 's' : ''}</CardDescription>
+          <CardDescription>
+            {selectedMonth !== 'tous'
+              ? `${moisDisponibles.find(m => m.value === selectedMonth)?.label} ${selectedYear}`
+              : `Année ${selectedYear}`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -302,14 +404,14 @@ export default function TresoreriePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.length === 0 ? (
+                {transactionsFiltreesAvecSolde.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      Aucune transaction pour le moment
+                      Aucune transaction pour cette période
                     </TableCell>
                   </TableRow>
                 ) : (
-                  transactions.map((transaction) => (
+                  transactionsFiltreesAvecSolde.map((transaction) => (
                     <TableRow key={transaction.id} className="hover:bg-muted/50">
                       <TableCell className="font-medium">
                         {formatDate(transaction.date_operation)}
