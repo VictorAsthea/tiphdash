@@ -54,10 +54,23 @@ export default function MandatsPage() {
   const [expandedMandatId, setExpandedMandatId] = useState<string | null>(null)
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [formData, setFormData] = useState({
-    statut: 'en_cours' as const,
+  const [formData, setFormData] = useState<{
+    statut: 'en_cours' | 'vendu' | 'annule' | 'potentiel'
+    numero_mandat: string
+    typologie: 'exclusif' | 'semi_exclusif' | 'co_exclusif' | 'simple'
+    vendeur: string
+    date_signature: string
+    bien: string
+    adresse: string
+    acquireur: string
+    date_compromis: string
+    date_reiteration_prevue: string
+    honoraires_agence_ht: number
+    honoraires_moi_ht: number
+  }>({
+    statut: 'en_cours',
     numero_mandat: '',
-    typologie: 'exclusif' as const,
+    typologie: 'exclusif',
     vendeur: '',
     date_signature: '',
     bien: '',
