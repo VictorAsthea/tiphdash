@@ -330,6 +330,20 @@ export default function MandatsPage() {
     return new Date(date).toLocaleDateString('fr-FR')
   }
 
+  // Vérifier si la date de réitération est proche (moins de 7 jours)
+  const isDateReitProche = (dateReiteration: string | null) => {
+    if (!dateReiteration) return false
+    const date = new Date(dateReiteration)
+    const aujourd'hui = new Date()
+    const diffJours = Math.ceil((date.getTime() - aujourd'hui.getTime()) / (1000 * 60 * 60 * 24))
+    return diffJours >= 0 && diffJours <= 7
+  }
+
+  // Compter les alertes
+  const alertesReiteration = mandats.filter(m =>
+    m.statut === 'en_cours' && isDateReitProche(m.date_reiteration_prevue)
+  )
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -339,6 +353,29 @@ export default function MandatsPage() {
         </div>
         <Button onClick={() => setIsAdding(true)}>Ajouter un mandat</Button>
       </div>
+
+      {/* Alertes */}
+      {alertesReiteration.length > 0 && (
+        <Card className="border-l-4 border-l-orange-500 bg-orange-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <div className="text-orange-600 text-xl">⚠️</div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-orange-900 mb-2">
+                  {alertesReiteration.length} réitération{alertesReiteration.length > 1 ? 's' : ''} à venir dans les 7 prochains jours
+                </h3>
+                <div className="space-y-1">
+                  {alertesReiteration.map(mandat => (
+                    <div key={mandat.id} className="text-sm text-orange-800">
+                      <strong>{mandat.numero_mandat}</strong> - {mandat.bien} - {formatDate(mandat.date_reiteration_prevue)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Barre de recherche et filtres */}
       <Card>
@@ -585,9 +622,16 @@ export default function MandatsPage() {
                         onClick={() => toggleExpand(mandat.id)}
                       >
                         <TableCell>
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${getStatutBadgeClass(mandat.statut)}`}>
-                            {getStatutLabel(mandat.statut)}
-                          </span>
+                          <div className="flex gap-2 items-center">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatutBadgeClass(mandat.statut)}`}>
+                              {getStatutLabel(mandat.statut)}
+                            </span>
+                            {isDateReitProche(mandat.date_reiteration_prevue) && (
+                              <span className="text-orange-600 text-sm" title="Réitération dans moins de 7 jours">
+                                ⚠️
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="font-medium">{mandat.numero_mandat}</TableCell>
                         <TableCell>{mandat.typologie}</TableCell>
