@@ -1,12 +1,24 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { ChartSkeleton } from '@/components/charts/chart-skeleton'
+
+// Lazy loading des graphiques pour performance
+const MonthlyChart = dynamic(
+  () => import('@/components/charts/monthly-chart').then(mod => ({ default: mod.MonthlyChart })),
+  { loading: () => <ChartSkeleton />, ssr: false }
+)
+
+const ObjectifChart = dynamic(
+  () => import('@/components/charts/objectif-chart').then(mod => ({ default: mod.ObjectifChart })),
+  { loading: () => <ChartSkeleton />, ssr: false }
+)
 
 type ProjectionCA = {
   id: string
@@ -108,46 +120,63 @@ export default function DashboardPage() {
     loadData()
   }
 
-  // Statistiques mandats
-  const totalMandats = mandats.length
-  const mandatsVendus = mandats.filter(m => m.statut === 'vendu').length
-  const mandatsEnCours = mandats.filter(m => m.statut === 'en_cours').length
-  const mandatsPotentiels = mandats.filter(m => m.statut === 'potentiel').length
+  // Mémoization des statistiques pour optimiser les performances
+  const stats = useMemo(() => {
+    const totalMandats = mandats.length
+    const mandatsVendus = mandats.filter(m => m.statut === 'vendu').length
+    const mandatsEnCours = mandats.filter(m => m.statut === 'en_cours').length
+    const mandatsPotentiels = mandats.filter(m => m.statut === 'potentiel').length
 
-  // CA Brut (honoraires HT des mandats vendus)
-  const caBrut = mandats
-    .filter(m => m.statut === 'vendu')
-    .reduce((sum, m) => sum + m.honoraires_moi_ht, 0)
+    // CA Brut (honoraires HT des mandats vendus)
+    const caBrut = mandats
+      .filter(m => m.statut === 'vendu')
+      .reduce((sum, m) => sum + m.honoraires_moi_ht, 0)
 
-  // CA Net (commission nette après URSSAF des mandats vendus)
-  const caNet = mandats
-    .filter(m => m.statut === 'vendu')
-    .reduce((sum, m) => sum + m.commission_nette, 0)
+    // CA Net (commission nette après URSSAF des mandats vendus)
+    const caNet = mandats
+      .filter(m => m.statut === 'vendu')
+      .reduce((sum, m) => sum + m.commission_nette, 0)
 
-  // URSSAF total (CA Brut - CA Net)
-  const urssafTotal = caBrut - caNet
+    // URSSAF total (CA Brut - CA Net)
+    const urssafTotal = caBrut - caNet
 
-  // CA Potentiel (honoraires HT des mandats potentiels)
-  const caPotentiel = mandats
-    .filter(m => m.statut === 'potentiel')
-    .reduce((sum, m) => sum + m.honoraires_moi_ht, 0)
+    // CA Potentiel (honoraires HT des mandats potentiels)
+    const caPotentiel = mandats
+      .filter(m => m.statut === 'potentiel')
+      .reduce((sum, m) => sum + m.honoraires_moi_ht, 0)
 
-  // Taux de réalisation
-  const tauxRealisation = projection && projection.objectif > 0
-    ? (caBrut / projection.objectif) * 100
-    : 0
+    // Taux de réalisation
+    const tauxRealisation = projection && projection.objectif > 0
+      ? (caBrut / projection.objectif) * 100
+      : 0
 
-  // Salaire mensuel net estimé = Total commission nette / 12
-  const salaireMensuelNetEstime = caNet / 12
+    // Salaire mensuel net estimé = Total commission nette / 12
+    const salaireMensuelNetEstime = caNet / 12
 
-  // URSSAF estimé sur les mandats en cours et potentiels
-  const caBrutEnCoursPotentiel = mandats
-    .filter(m => m.statut === 'en_cours' || m.statut === 'potentiel')
-    .reduce((sum, m) => sum + m.honoraires_moi_ht, 0)
+    // URSSAF estimé sur les mandats en cours et potentiels
+    const caBrutEnCoursPotentiel = mandats
+      .filter(m => m.statut === 'en_cours' || m.statut === 'potentiel')
+      .reduce((sum, m) => sum + m.honoraires_moi_ht, 0)
 
-  const urssafEstimeEnCoursPotentiel = caBrutEnCoursPotentiel - mandats
-    .filter(m => m.statut === 'en_cours' || m.statut === 'potentiel')
-    .reduce((sum, m) => sum + m.commission_nette, 0)
+    const urssafEstimeEnCoursPotentiel = caBrutEnCoursPotentiel - mandats
+      .filter(m => m.statut === 'en_cours' || m.statut === 'potentiel')
+      .reduce((sum, m) => sum + m.commission_nette, 0)
+
+    return {
+      totalMandats,
+      mandatsVendus,
+      mandatsEnCours,
+      mandatsPotentiels,
+      caBrut,
+      caNet,
+      urssafTotal,
+      caPotentiel,
+      tauxRealisation,
+      salaireMensuelNetEstime,
+      caBrutEnCoursPotentiel,
+      urssafEstimeEnCoursPotentiel,
+    }
+  }, [mandats, projection])
 
   // Données pour le graphique d'évolution mensuelle du CA
   const monthlyData = React.useMemo(() => {
@@ -177,129 +206,88 @@ export default function DashboardPage() {
   }, [mandats, formData.year])
 
   // Données pour le graphique objectif vs réalisé
-  const objectifData = [
+  const objectifData = useMemo(() => [
     {
       name: 'CA Annuel',
       'Objectif': projection?.objectif || 0,
-      'Réalisé': Math.round(caBrut),
-      'Potentiel': Math.round(caPotentiel),
+      'Réalisé': Math.round(stats.caBrut),
+      'Potentiel': Math.round(stats.caPotentiel),
     }
-  ]
+  ], [projection, stats.caBrut, stats.caPotentiel])
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-4xl font-bold text-primary">Dashboard {formData.year}</h1>
+    <div className="space-y-10">
+      <div className="relative overflow-hidden rounded-xl p-8 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border border-primary/10">
+        <h1 className="text-5xl font-bold tracking-tight text-primary">Dashboard {formData.year}</h1>
         <p className="text-muted-foreground mt-1">Vue d&apos;ensemble de votre activité immobilière</p>
       </div>
 
       {/* KPIs Principaux - Grande grille */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-xs uppercase tracking-wide">Total Mandats</CardDescription>
+      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
+            <CardDescription className="text-xs uppercase tracking-wide font-medium">Total Mandats</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-5xl font-bold text-primary">{totalMandats}</div>
+          <CardContent className="pt-2">
+            <div className="text-6xl font-bold tracking-tighter text-primary">{stats.totalMandats}</div>
             <p className="text-xs text-muted-foreground mt-2">
-              {mandatsVendus} vendus • {mandatsEnCours} en cours
+              {stats.mandatsVendus} vendus • {stats.mandatsEnCours} en cours
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-transparent">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-xs uppercase tracking-wide">Mandats Vendus</CardDescription>
+        <Card className="border-2 border-[hsl(var(--chart-2))]/20 bg-gradient-to-br from-[hsl(var(--chart-2))]/5 to-transparent transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
+            <CardDescription className="text-xs uppercase tracking-wide font-medium">Mandats Vendus</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-5xl font-bold text-green-600">{mandatsVendus}</div>
+          <CardContent className="pt-2">
+            <div className="text-6xl font-bold tracking-tighter text-[hsl(var(--chart-2))]">{stats.mandatsVendus}</div>
             <p className="text-xs text-muted-foreground mt-2">
-              {mandatsVendus > 0 ? ((mandatsVendus / totalMandats) * 100).toFixed(0) : 0}% du total
+              {stats.mandatsVendus > 0 ? ((stats.mandatsVendus / stats.totalMandats) * 100).toFixed(0) : 0}% du total
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-transparent">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-xs uppercase tracking-wide">En Cours</CardDescription>
+        <Card className="border-2 border-[hsl(var(--chart-3))]/20 bg-gradient-to-br from-[hsl(var(--chart-3))]/5 to-transparent transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
+            <CardDescription className="text-xs uppercase tracking-wide font-medium">En Cours</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-5xl font-bold text-blue-600">{mandatsEnCours}</div>
+          <CardContent className="pt-2">
+            <div className="text-6xl font-bold tracking-tighter text-[hsl(var(--chart-3))]">{stats.mandatsEnCours}</div>
             <p className="text-xs text-muted-foreground mt-2">Mandats actifs</p>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-transparent">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-xs uppercase tracking-wide">Potentiels</CardDescription>
+        <Card className="border-2 border-[hsl(var(--chart-4))]/20 bg-gradient-to-br from-[hsl(var(--chart-4))]/5 to-transparent transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
+            <CardDescription className="text-xs uppercase tracking-wide font-medium">Potentiels</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-5xl font-bold text-yellow-600">{mandatsPotentiels}</div>
+          <CardContent className="pt-2">
+            <div className="text-6xl font-bold tracking-tighter text-[hsl(var(--chart-4))]">{stats.mandatsPotentiels}</div>
             <p className="text-xs text-muted-foreground mt-2">À développer</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Graphiques d'évolution */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-8 lg:grid-cols-2">
         {/* Graphique courbe - Évolution mensuelle du CA */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Évolution mensuelle du CA</CardTitle>
-            <CardDescription>CA Brut et Net par mois en {formData.year}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="mois" />
-                <YAxis />
-                <Tooltip
-                  formatter={(value) => `${Number(value).toLocaleString('fr-FR')} €`}
-                />
-                <Legend />
-                <Line type="monotone" dataKey="CA Brut" stroke="hsl(var(--primary))" strokeWidth={2} />
-                <Line type="monotone" dataKey="CA Net" stroke="hsl(142, 76%, 36%)" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <MonthlyChart data={monthlyData} year={formData.year} />
 
         {/* Graphique barres - Objectif vs Réalisé */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Objectif vs Réalisé</CardTitle>
-            <CardDescription>Comparaison annuelle</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={objectifData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip
-                  formatter={(value) => `${Number(value).toLocaleString('fr-FR')} €`}
-                />
-                <Legend />
-                <Bar dataKey="Objectif" fill="hsl(var(--primary))" />
-                <Bar dataKey="Réalisé" fill="hsl(142, 76%, 36%)" />
-                <Bar dataKey="Potentiel" fill="hsl(48, 96%, 53%)" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <ObjectifChart data={objectifData} />
       </div>
 
       {/* CA Statistics - Cartes plus grandes et stylées */}
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="border-2 border-primary/20">
-          <CardHeader className="pb-3">
+      <div className="grid gap-8 md:grid-cols-3">
+        <Card className="border-2 border-primary/20 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
             <CardTitle className="text-lg">CA Brut</CardTitle>
             <CardDescription>Honoraires HT vendus</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-2 px-8 pb-8">
             <div className="text-4xl font-bold text-primary mb-2">
-              {caBrut.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+              {stats.caBrut.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
             </div>
             {projection && projection.objectif > 0 && (
               <div className="space-y-2">
@@ -307,82 +295,82 @@ export default function DashboardPage() {
                   <span className="text-muted-foreground">Objectif</span>
                   <span className="font-semibold">{projection.objectif.toLocaleString('fr-FR')} €</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div className="w-full bg-muted/30 rounded-full h-4 overflow-hidden backdrop-blur-sm">
                   <div
-                    className="bg-primary h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(tauxRealisation, 100)}%` }}
+                    className="bg-gradient-to-r from-primary to-primary/80 h-full rounded-full transition-all duration-700 ease-out shadow-lg"
+                    style={{ width: `${Math.min(stats.tauxRealisation, 100)}%` }}
                   />
                 </div>
                 <p className="text-xs text-primary font-bold text-right">
-                  {tauxRealisation.toFixed(1)}% réalisé
+                  {stats.tauxRealisation.toFixed(1)}% réalisé
                 </p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50/50 to-transparent">
-          <CardHeader className="pb-3">
+        <Card className="border-2 border-[hsl(var(--chart-2))]/20 bg-gradient-to-br from-[hsl(var(--chart-2))]/5 to-transparent backdrop-blur-sm bg-card/95 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
             <CardTitle className="text-lg">CA Net</CardTitle>
             <CardDescription>Après Urssaf + PL</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-green-600 mb-2">
-              {caNet.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+          <CardContent className="pt-2 px-8 pb-8">
+            <div className="text-4xl font-bold text-[hsl(var(--chart-2))] mb-2">
+              {stats.caNet.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
             </div>
             <div className="space-y-1 text-sm">
               <div className="flex justify-between p-2 bg-white/50 dark:bg-white/5 rounded">
                 <span className="text-muted-foreground">CA Brut</span>
-                <span className="font-semibold">{caBrut.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                <span className="font-semibold">{stats.caBrut.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
               </div>
               <div className="flex justify-between p-2 bg-red-50/80 dark:bg-red-900/10 rounded">
                 <span className="text-muted-foreground">- URSSAF + PL</span>
-                <span className="font-semibold text-red-600 dark:text-red-400">{urssafTotal.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                <span className="font-semibold text-red-600 dark:text-red-400">{stats.urssafTotal.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
               </div>
               <div className="flex justify-between text-xs text-muted-foreground pt-1">
                 <span>Taux de marge net</span>
-                <span>{caBrut > 0 ? ((caNet / caBrut) * 100).toFixed(1) : 0}%</span>
+                <span>{stats.caBrut > 0 ? ((stats.caNet / stats.caBrut) * 100).toFixed(1) : 0}%</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50/50 to-transparent">
-          <CardHeader className="pb-3">
+        <Card className="border-2 border-[hsl(var(--chart-4))]/20 bg-gradient-to-br from-[hsl(var(--chart-4))]/5 to-transparent transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
             <CardTitle className="text-lg">CA Potentiel</CardTitle>
             <CardDescription>Mandats potentiels</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-yellow-600 mb-2">
-              {caPotentiel.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+          <CardContent className="pt-2 px-8 pb-8">
+            <div className="text-4xl font-bold text-[hsl(var(--chart-4))] mb-2">
+              {stats.caPotentiel.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
             </div>
             <p className="text-sm text-muted-foreground">
-              {mandatsPotentiels} mandat{mandatsPotentiels > 1 ? 's' : ''} en attente
+              {stats.mandatsPotentiels} mandat{stats.mandatsPotentiels > 1 ? 's' : ''} en attente
             </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Revenus & Fiscalité */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50/50 to-transparent">
-          <CardHeader>
+      <div className="grid gap-8 md:grid-cols-2">
+        <Card className="border-2 border-[hsl(var(--chart-5))]/20 bg-gradient-to-br from-[hsl(var(--chart-5))]/5 to-transparent backdrop-blur-sm bg-card/95 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2">
               <span>💰</span>
               Salaire Mensuel Net Estimé
             </CardTitle>
             <CardDescription>Calculé automatiquement</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-5xl font-bold text-purple-600 mb-4">
-              {salaireMensuelNetEstime.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+          <CardContent className="pt-2 px-8 pb-8">
+            <div className="text-5xl font-bold text-[hsl(var(--chart-5))] mb-4">
+              {stats.salaireMensuelNetEstime.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
             </div>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between p-2 bg-white rounded">
+              <div className="flex justify-between p-2 bg-white/50 dark:bg-white/5 rounded">
                 <span className="text-muted-foreground">CA Net total</span>
-                <span className="font-semibold">{caNet.toLocaleString('fr-FR')} €</span>
+                <span className="font-semibold">{stats.caNet.toLocaleString('fr-FR')} €</span>
               </div>
-              <div className="flex justify-between p-2 bg-white rounded">
+              <div className="flex justify-between p-2 bg-white/50 dark:bg-white/5 rounded">
                 <span className="text-muted-foreground">Divisé par</span>
                 <span className="font-semibold">12 mois</span>
               </div>
@@ -390,31 +378,31 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-orange-200 bg-gradient-to-br from-orange-50/50 to-transparent">
-          <CardHeader>
+        <Card className="border-2 border-[hsl(var(--chart-3))]/20 bg-gradient-to-br from-[hsl(var(--chart-3))]/5 to-transparent backdrop-blur-sm bg-card/95 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2">
               <span>📊</span>
               URSSAF à prévoir (En cours + Potentiel)
             </CardTitle>
             <CardDescription>Estimation sur les mandats non vendus</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-5xl font-bold text-orange-600 mb-4">
-              {urssafEstimeEnCoursPotentiel.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+          <CardContent className="pt-2 px-8 pb-8">
+            <div className="text-5xl font-bold text-[hsl(var(--chart-3))] mb-4">
+              {stats.urssafEstimeEnCoursPotentiel.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
             </div>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between p-2 bg-white/70 dark:bg-white/5 rounded">
+              <div className="flex justify-between p-2 bg-white/50 dark:bg-white/5 rounded">
                 <span className="text-muted-foreground">CA Brut (En cours + Potentiel)</span>
-                <span className="font-semibold">{caBrutEnCoursPotentiel.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                <span className="font-semibold">{stats.caBrutEnCoursPotentiel.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
               </div>
-              <div className="flex justify-between p-2 bg-orange-50/80 dark:bg-orange-900/10 rounded">
+              <div className="flex justify-between p-2 bg-[hsl(var(--chart-3))]/10 dark:bg-[hsl(var(--chart-3))]/10 rounded">
                 <span className="text-muted-foreground">URSSAF estimé à payer</span>
-                <span className="font-semibold text-orange-600 dark:text-orange-400">{urssafEstimeEnCoursPotentiel.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                <span className="font-semibold text-[hsl(var(--chart-3))]">{stats.urssafEstimeEnCoursPotentiel.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
               </div>
               <div className="h-px bg-border my-2"></div>
-              <div className="flex justify-between p-2 bg-blue-50/80 dark:bg-blue-900/10 rounded">
+              <div className="flex justify-between p-2 bg-[hsl(var(--chart-2))]/10 dark:bg-[hsl(var(--chart-2))]/10 rounded">
                 <span className="text-muted-foreground font-medium">CA Net potentiel</span>
-                <span className="font-bold text-blue-600 dark:text-blue-400">{(caBrutEnCoursPotentiel - urssafEstimeEnCoursPotentiel).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                <span className="font-bold text-[hsl(var(--chart-2))]">{(stats.caBrutEnCoursPotentiel - stats.urssafEstimeEnCoursPotentiel).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
               </div>
               <p className="text-xs text-muted-foreground mt-3 italic">
                 💡 Calculé avec le taux URSSAF actuel de la configuration
@@ -425,12 +413,12 @@ export default function DashboardPage() {
       </div>
 
       {/* Objectif de l'année */}
-      <Card>
-        <CardHeader>
+      <Card className="transition-all duration-300 hover:shadow-lg">
+        <CardHeader className="pb-4">
           <CardTitle>Objectif CA {formData.year}</CardTitle>
           <CardDescription>Définissez votre cible annuelle</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-2 px-8 pb-8">
           {isEditingObjectif ? (
             <div className="space-y-4">
               <div className="space-y-2">
@@ -445,8 +433,12 @@ export default function DashboardPage() {
                 />
               </div>
               <div className="flex gap-2">
-                <Button onClick={handleSaveObjectif}>Enregistrer</Button>
-                <Button variant="outline" onClick={() => setIsEditingObjectif(false)}>Annuler</Button>
+                <Button onClick={handleSaveObjectif} className="transition-all duration-200 active:scale-95">
+                  Enregistrer
+                </Button>
+                <Button variant="outline" onClick={() => setIsEditingObjectif(false)} className="transition-all duration-200 active:scale-95">
+                  Annuler
+                </Button>
               </div>
             </div>
           ) : (
@@ -459,11 +451,11 @@ export default function DashboardPage() {
                 <div className="text-right">
                   <p className="text-sm text-muted-foreground">Restant à réaliser</p>
                   <p className="text-2xl font-bold text-muted-foreground">
-                    {Math.max(0, formData.objectif - caBrut).toLocaleString('fr-FR')} €
+                    {Math.max(0, formData.objectif - stats.caBrut).toLocaleString('fr-FR')} €
                   </p>
                 </div>
               </div>
-              <Button onClick={() => setIsEditingObjectif(true)} variant="outline" className="w-full">
+              <Button onClick={() => setIsEditingObjectif(true)} variant="outline" className="w-full transition-all duration-200 active:scale-95">
                 Modifier l&apos;objectif
               </Button>
             </div>

@@ -18,17 +18,17 @@ type Mandat = {
 }
 
 const COLORS = {
-  vendu: 'hsl(142, 76%, 36%)',
-  en_cours: 'hsl(221, 83%, 53%)',
-  potentiel: 'hsl(48, 96%, 53%)',
-  annule: 'hsl(0, 84%, 60%)',
+  vendu: '#10b981',      // Vert
+  en_cours: '#3b82f6',   // Bleu
+  potentiel: '#f59e0b',  // Orange/Jaune
+  annule: '#ef4444',     // Rouge
 }
 
 const TYPOLOGIE_COLORS = {
-  exclusif: 'hsl(var(--primary))',
-  semi_exclusif: 'hsl(142, 76%, 36%)',
-  co_exclusif: 'hsl(221, 83%, 53%)',
-  simple: 'hsl(48, 96%, 53%)',
+  exclusif: '#8b5cf6',      // Violet/Primary
+  semi_exclusif: '#10b981', // Vert
+  co_exclusif: '#3b82f6',   // Bleu
+  simple: '#f59e0b',        // Orange
 }
 
 export default function AnalyticsPage() {
@@ -143,63 +143,63 @@ export default function AnalyticsPage() {
   const caMoyen = mandatsVendus > 0 ? caTotal / mandatsVendus : 0
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-4xl font-bold text-primary">Analytics</h1>
+    <div className="space-y-10">
+      <div className="relative overflow-hidden rounded-xl p-8 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border border-primary/10">
+        <h1 className="text-5xl font-bold tracking-tight text-primary">Analytics</h1>
         <p className="text-muted-foreground mt-1">Analyses détaillées de votre activité</p>
       </div>
 
       {/* KPIs généraux */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription className="text-xs">Taux de conversion</CardDescription>
+      <div className="grid gap-8 md:grid-cols-4">
+        <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
+            <CardDescription className="text-xs uppercase tracking-wide font-medium">Taux de conversion</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary">{tauxConversion.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground mt-1">
+          <CardContent className="pt-2">
+            <div className="text-6xl font-bold tracking-tighter text-primary">{tauxConversion.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground mt-2">
               {mandatsVendus} / {totalMandats} mandats
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription className="text-xs">CA Moyen par vente</CardDescription>
+        <Card className="border-2 border-[hsl(var(--chart-2))]/20 bg-gradient-to-br from-[hsl(var(--chart-2))]/5 to-transparent transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
+            <CardDescription className="text-xs uppercase tracking-wide font-medium">CA Moyen par vente</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-600">
+          <CardContent className="pt-2">
+            <div className="text-6xl font-bold tracking-tighter text-[hsl(var(--chart-2))]">
               {caMoyen.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-2">
               Honoraires HT moyens
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription className="text-xs">CA Total réalisé</CardDescription>
+        <Card className="border-2 border-[hsl(var(--chart-3))]/20 bg-gradient-to-br from-[hsl(var(--chart-3))]/5 to-transparent transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
+            <CardDescription className="text-xs uppercase tracking-wide font-medium">CA Total réalisé</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary">
+          <CardContent className="pt-2">
+            <div className="text-6xl font-bold tracking-tighter text-[hsl(var(--chart-3))]">
               {caTotal.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-2">
               Sur {mandatsVendus} ventes
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription className="text-xs">Mandats actifs</CardDescription>
+        <Card className="border-2 border-[hsl(var(--chart-4))]/20 bg-gradient-to-br from-[hsl(var(--chart-4))]/5 to-transparent transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
+            <CardDescription className="text-xs uppercase tracking-wide font-medium">Mandats actifs</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-600">
+          <CardContent className="pt-2">
+            <div className="text-6xl font-bold tracking-tighter text-[hsl(var(--chart-4))]">
               {mandats.filter(m => m.statut === 'en_cours').length}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-2">
               En cours de traitement
             </p>
           </CardContent>
@@ -207,14 +207,14 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Graphiques principaux */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-8 lg:grid-cols-2">
         {/* Répartition par statut */}
-        <Card>
-          <CardHeader>
+        <Card className="transition-all duration-300 hover:shadow-lg">
+          <CardHeader className="pb-4">
             <CardTitle>Répartition par statut</CardTitle>
             <CardDescription>Distribution de tous les mandats</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-8 pb-8">
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
@@ -238,12 +238,12 @@ export default function AnalyticsPage() {
         </Card>
 
         {/* Répartition par typologie */}
-        <Card>
-          <CardHeader>
+        <Card className="transition-all duration-300 hover:shadow-lg">
+          <CardHeader className="pb-4">
             <CardTitle>Répartition par typologie</CardTitle>
             <CardDescription>Types de mandats gérés</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-8 pb-8">
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
@@ -268,22 +268,24 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Analyses avancées */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-8 lg:grid-cols-2">
         {/* CA moyen par typologie */}
         {caMoyenData.length > 0 && (
-          <Card>
-            <CardHeader>
+          <Card className="transition-all duration-300 hover:shadow-lg">
+            <CardHeader className="pb-4">
               <CardTitle>CA Moyen par typologie</CardTitle>
               <CardDescription>Rentabilité par type de mandat (vendus)</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-8 pb-8">
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={caMoyenData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => `${Number(value).toLocaleString('fr-FR')} €`} />
-                  <Bar dataKey="CA Moyen" fill="hsl(var(--primary))" />
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="name" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <Tooltip
+                    formatter={(value) => `${Number(value).toLocaleString('fr-FR')} €`}
+                  />
+                  <Bar dataKey="CA Moyen" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -292,19 +294,21 @@ export default function AnalyticsPage() {
 
         {/* Évolution cumulative */}
         {evolutionCumulative.length > 0 && (
-          <Card>
-            <CardHeader>
+          <Card className="transition-all duration-300 hover:shadow-lg">
+            <CardHeader className="pb-4">
               <CardTitle>Évolution cumulative du CA</CardTitle>
               <CardDescription>Progression du CA au fil des ventes</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-8 pb-8">
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={evolutionCumulative}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => `${Number(value).toLocaleString('fr-FR')} €`} />
-                  <Line type="monotone" dataKey="CA Cumulé" stroke="hsl(142, 76%, 36%)" strokeWidth={2} />
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="date" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <Tooltip
+                    formatter={(value) => `${Number(value).toLocaleString('fr-FR')} €`}
+                  />
+                  <Line type="monotone" dataKey="CA Cumulé" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>

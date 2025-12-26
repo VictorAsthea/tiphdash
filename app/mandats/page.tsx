@@ -353,15 +353,15 @@ export default function MandatsPage() {
   const getStatutBadgeClass = (statut: string) => {
     switch (statut) {
       case 'vendu':
-        return 'bg-green-100 text-green-800'
+        return 'bg-[hsl(var(--chart-2))]/10 text-[hsl(var(--chart-2))] dark:bg-[hsl(var(--chart-2))]/20'
       case 'en_cours':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-[hsl(var(--chart-3))]/10 text-[hsl(var(--chart-3))] dark:bg-[hsl(var(--chart-3))]/20'
       case 'potentiel':
-        return 'bg-yellow-100 text-yellow-800'
+        return 'bg-[hsl(var(--chart-4))]/10 text-[hsl(var(--chart-4))] dark:bg-[hsl(var(--chart-4))]/20'
       case 'annule':
-        return 'bg-red-100 text-red-800'
+        return 'bg-destructive/10 text-destructive dark:bg-destructive/20'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-muted/30 text-muted-foreground'
     }
   }
 
@@ -400,33 +400,33 @@ export default function MandatsPage() {
   )
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-primary">Gestion des Mandats</h1>
-          <p className="text-muted-foreground">Liste de tous vos mandats</p>
+    <div className="space-y-10">
+      <div className="flex justify-between items-center gap-4">
+        <div className="relative overflow-hidden rounded-xl p-8 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border border-primary/10 flex-1">
+          <h1 className="text-5xl font-bold tracking-tight text-primary">Gestion des Mandats</h1>
+          <p className="text-muted-foreground mt-1">Liste de tous vos mandats</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportCSV}>
+          <Button variant="outline" onClick={handleExportCSV} className="transition-all duration-200 active:scale-95">
             Exporter CSV
           </Button>
-          <Button onClick={() => setIsAdding(true)}>Ajouter un mandat</Button>
+          <Button onClick={() => setIsAdding(true)} className="transition-all duration-200 active:scale-95">Ajouter un mandat</Button>
         </div>
       </div>
 
       {/* Alertes */}
       {alertesReiteration.length > 0 && (
-        <Card className="border-l-4 border-l-orange-500 bg-orange-50">
-          <CardContent className="pt-6">
+        <Card className="border-l-4 border-l-[hsl(var(--chart-3))] bg-[hsl(var(--chart-3))]/5 dark:bg-[hsl(var(--chart-3))]/10 transition-all duration-300 hover:shadow-lg">
+          <CardContent className="pt-6 px-8 pb-8">
             <div className="flex items-start gap-3">
-              <div className="text-orange-600 text-xl">⚠️</div>
+              <div className="text-[hsl(var(--chart-3))] text-xl">⚠️</div>
               <div className="flex-1">
-                <h3 className="font-semibold text-orange-900 mb-2">
+                <h3 className="font-semibold text-foreground mb-2">
                   {alertesReiteration.length} réitération{alertesReiteration.length > 1 ? 's' : ''} à venir dans les 7 prochains jours
                 </h3>
                 <div className="space-y-1">
                   {alertesReiteration.map(mandat => (
-                    <div key={mandat.id} className="text-sm text-orange-800">
+                    <div key={mandat.id} className="text-sm text-muted-foreground">
                       <strong>{mandat.numero_mandat}</strong> - {mandat.bien} - {formatDate(mandat.date_reiteration_prevue)}
                     </div>
                   ))}
@@ -438,8 +438,8 @@ export default function MandatsPage() {
       )}
 
       {/* Barre de recherche et filtres */}
-      <Card>
-        <CardContent className="pt-6">
+      <Card className="transition-all duration-300 hover:shadow-lg">
+        <CardContent className="pt-6 px-8 pb-8">
           <div className="grid gap-4 md:grid-cols-4">
             <div className="md:col-span-2 space-y-2">
               <Label htmlFor="search">Rechercher</Label>
@@ -488,12 +488,12 @@ export default function MandatsPage() {
       </Card>
 
       {isAdding && (
-        <Card>
-          <CardHeader>
+        <Card className="transition-all duration-300 hover:shadow-lg">
+          <CardHeader className="pb-4">
             <CardTitle>{editingId ? 'Modifier' : 'Ajouter'} un mandat</CardTitle>
             <CardDescription>Remplissez les informations du mandat</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-8 pb-8">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="statut">Statut</Label>
@@ -625,7 +625,7 @@ export default function MandatsPage() {
             </div>
 
             <div className="flex gap-2 mt-6">
-              <Button onClick={handleSave}>Enregistrer</Button>
+              <Button onClick={handleSave} className="transition-all duration-200 active:scale-95">Enregistrer</Button>
               <Button
                 variant="outline"
                 onClick={() => {
@@ -633,6 +633,7 @@ export default function MandatsPage() {
                   setEditingId(null)
                   resetForm()
                 }}
+                className="transition-all duration-200 active:scale-95"
               >
                 Annuler
               </Button>
@@ -641,11 +642,11 @@ export default function MandatsPage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
+      <Card className="transition-all duration-300 hover:shadow-lg">
+        <CardHeader className="pb-4">
           <CardTitle>Liste des mandats</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-8 pb-8">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -698,17 +699,16 @@ export default function MandatsPage() {
                             {mandat.statut !== 'vendu' && (
                               <Button
                                 size="sm"
-                                variant="default"
                                 onClick={() => handleValiderVente(mandat)}
-                                className="bg-green-600 hover:bg-green-700"
+                                className="bg-green-600 hover:bg-green-700 text-white dark:bg-[hsl(var(--chart-2))] dark:hover:bg-[hsl(var(--chart-2))]/90 transition-all duration-200 active:scale-95"
                               >
                                 Valider vente
                               </Button>
                             )}
-                            <Button size="sm" variant="outline" onClick={() => handleEdit(mandat)}>
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(mandat)} className="transition-all duration-200 active:scale-95">
                               Modifier
                             </Button>
-                            <Button size="sm" variant="destructive" onClick={() => handleDelete(mandat.id)}>
+                            <Button size="sm" variant="destructive" onClick={() => handleDelete(mandat.id)} className="transition-all duration-200 active:scale-95">
                               Supprimer
                             </Button>
                           </div>

@@ -199,24 +199,24 @@ export default function TresoreriePage() {
   const totalDebits = transactionsFiltreesAvecSolde.reduce((sum, t) => sum + t.debit, 0)
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-primary">Trésorerie</h1>
-          <p className="text-muted-foreground">Suivi de vos flux financiers</p>
+    <div className="space-y-10">
+      <div className="flex justify-between items-center gap-4">
+        <div className="relative overflow-hidden rounded-xl p-8 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border border-primary/10 flex-1">
+          <h1 className="text-5xl font-bold tracking-tight text-primary">Trésorerie</h1>
+          <p className="text-muted-foreground mt-1">Suivi de vos flux financiers</p>
         </div>
-        <Button onClick={() => setIsAdding(true)} size="lg">
+        <Button onClick={() => setIsAdding(true)} size="lg" className="transition-all duration-200 active:scale-95">
           + Nouvelle transaction
         </Button>
       </div>
 
       {/* Filtres */}
-      <Card>
-        <CardHeader>
+      <Card className="transition-all duration-300 hover:shadow-lg">
+        <CardHeader className="pb-4">
           <CardTitle>Filtres</CardTitle>
           <CardDescription>Sélectionnez une période</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-8 pb-8">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Année</Label>
@@ -264,35 +264,35 @@ export default function TresoreriePage() {
       </Card>
 
       {/* Indicateurs principaux */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-2 border-primary/20">
-          <CardHeader className="pb-2">
-            <CardDescription>Solde Actuel</CardDescription>
+      <div className="grid gap-8 md:grid-cols-3">
+        <Card className="border-2 border-primary/20 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
+            <CardDescription className="text-xs uppercase tracking-wide font-medium">Solde Actuel</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className={`text-4xl font-bold ${soldeActuel >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <CardContent className="pt-2">
+            <div className={`text-5xl font-bold tracking-tighter ${soldeActuel >= 0 ? 'text-[hsl(var(--chart-2))]' : 'text-destructive'}`}>
               {soldeActuel >= 0 ? '+' : ''}{formatMontant(soldeActuel)} €
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total Crédits</CardDescription>
+        <Card className="transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
+            <CardDescription className="text-xs uppercase tracking-wide font-medium">Total Crédits</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-600">
+          <CardContent className="pt-2">
+            <div className="text-4xl font-bold tracking-tighter text-[hsl(var(--chart-2))]">
               +{formatMontant(totalCredits)} €
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total Débits</CardDescription>
+        <Card className="transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+          <CardHeader className="pb-4">
+            <CardDescription className="text-xs uppercase tracking-wide font-medium">Total Débits</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-red-600">
+          <CardContent className="pt-2">
+            <div className="text-4xl font-bold tracking-tighter text-destructive">
               -{formatMontant(totalDebits)} €
             </div>
           </CardContent>
@@ -301,12 +301,12 @@ export default function TresoreriePage() {
 
       {/* Formulaire d'ajout */}
       {isAdding && (
-        <Card className="border-primary/50">
-          <CardHeader>
+        <Card className="border-2 border-primary/30 transition-all duration-300 hover:shadow-lg">
+          <CardHeader className="pb-4">
             <CardTitle>{editingId ? 'Modifier' : 'Ajouter'} une transaction</CardTitle>
             <CardDescription>Enregistrez une opération de trésorerie</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-8 pb-8">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="type_operation">Type d&apos;opération</Label>
@@ -316,10 +316,10 @@ export default function TresoreriePage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="credit">
-                      <span className="text-green-600 font-medium">Crédit (Entrée d&apos;argent)</span>
+                      <span className="text-[hsl(var(--chart-2))] font-medium">Crédit (Entrée d&apos;argent)</span>
                     </SelectItem>
                     <SelectItem value="debit">
-                      <span className="text-red-600 font-medium">Débit (Sortie d&apos;argent)</span>
+                      <span className="text-destructive font-medium">Débit (Sortie d&apos;argent)</span>
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -362,7 +362,7 @@ export default function TresoreriePage() {
             </div>
 
             <div className="flex gap-2 mt-6">
-              <Button onClick={handleSave} size="lg">
+              <Button onClick={handleSave} size="lg" className="transition-all duration-200 active:scale-95">
                 {editingId ? 'Mettre à jour' : 'Enregistrer'}
               </Button>
               <Button
@@ -372,6 +372,7 @@ export default function TresoreriePage() {
                   setEditingId(null)
                   resetForm()
                 }}
+                className="transition-all duration-200 active:scale-95"
               >
                 Annuler
               </Button>
@@ -381,8 +382,8 @@ export default function TresoreriePage() {
       )}
 
       {/* Liste des transactions */}
-      <Card>
-        <CardHeader>
+      <Card className="transition-all duration-300 hover:shadow-lg">
+        <CardHeader className="pb-4">
           <CardTitle>Historique des transactions</CardTitle>
           <CardDescription>
             {selectedMonth !== 'tous'
@@ -390,7 +391,7 @@ export default function TresoreriePage() {
               : `Année ${selectedYear}`}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-8 pb-8">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -418,20 +419,20 @@ export default function TresoreriePage() {
                       </TableCell>
                       <TableCell className="text-right">
                         {transaction.debit > 0 && (
-                          <span className="text-red-600 font-semibold">
+                          <span className="text-destructive font-semibold">
                             -{formatMontant(transaction.debit)} €
                           </span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
                         {transaction.credit > 0 && (
-                          <span className="text-green-600 font-semibold">
+                          <span className="text-[hsl(var(--chart-2))] font-semibold">
                             +{formatMontant(transaction.credit)} €
                           </span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className={`font-bold text-lg ${(transaction.solde || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <span className={`font-bold text-lg ${(transaction.solde || 0) >= 0 ? 'text-[hsl(var(--chart-2))]' : 'text-destructive'}`}>
                           {formatMontant(transaction.solde || 0)} €
                         </span>
                       </TableCell>
@@ -440,10 +441,10 @@ export default function TresoreriePage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleEdit(transaction)}>
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(transaction)} className="transition-all duration-200 active:scale-95">
                             Modifier
                           </Button>
-                          <Button size="sm" variant="destructive" onClick={() => handleDelete(transaction.id)}>
+                          <Button size="sm" variant="destructive" onClick={() => handleDelete(transaction.id)} className="transition-all duration-200 active:scale-95">
                             Supprimer
                           </Button>
                         </div>
