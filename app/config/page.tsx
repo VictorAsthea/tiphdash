@@ -28,6 +28,7 @@ export default function ConfigPage() {
   const { theme, toggleTheme, mounted } = useTheme();
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
     loadData();
   }, []);
 
@@ -58,7 +59,9 @@ export default function ConfigPage() {
   return (
     <div className="space-y-10">
       <div className="relative overflow-hidden rounded-xl p-8 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border border-primary/10">
-        <h1 className="text-5xl font-bold tracking-tight text-primary">Configuration</h1>
+        <h1 className="text-5xl font-bold tracking-tight text-primary">
+          Configuration
+        </h1>
         <p className="text-muted-foreground mt-1">
           Gérez les taux et paramètres de calcul
         </p>
@@ -97,8 +100,17 @@ export default function ConfigPage() {
                 </div>
               ))}
               <div className="flex gap-2 pt-4">
-                <Button onClick={handleSave} className="transition-all duration-200 active:scale-95">Enregistrer</Button>
-                <Button variant="outline" onClick={() => setIsEditing(false)} className="transition-all duration-200 active:scale-95">
+                <Button
+                  onClick={handleSave}
+                  className="transition-all duration-200 active:scale-95"
+                >
+                  Enregistrer
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsEditing(false)}
+                  className="transition-all duration-200 active:scale-95"
+                >
                   Annuler
                 </Button>
               </div>
@@ -113,7 +125,9 @@ export default function ConfigPage() {
                   <span className="text-sm text-muted-foreground">
                     {config.label}
                   </span>
-                  <span className="text-lg font-semibold text-primary">{config.value}%</span>
+                  <span className="text-lg font-semibold text-primary">
+                    {config.value}%
+                  </span>
                 </div>
               ))}
               <Button

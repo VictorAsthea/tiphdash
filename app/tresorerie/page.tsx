@@ -164,8 +164,28 @@ export default function TresoreriePage() {
     return yearMatch && monthMatch
   })
 
-  // Recalculer le solde pour les transactions filtrées
-  let soldeCumule = 0
+  // Calculer le solde initial (somme des transactions avant la période filtrée)
+  const soldeInitial = transactions
+    .filter(t => {
+      const dateTransaction = new Date(t.date_operation)
+      const transactionYear = dateTransaction.getFullYear()
+      const transactionMonth = dateTransaction.getMonth() + 1
+
+      if (selectedMonth === 'tous') {
+        // Transactions des années précédentes
+        return transactionYear < parseInt(selectedYear)
+      } else {
+        // Transactions avant le mois sélectionné (même année ou années précédentes)
+        return (
+          transactionYear < parseInt(selectedYear) ||
+          (transactionYear === parseInt(selectedYear) && transactionMonth < parseInt(selectedMonth))
+        )
+      }
+    })
+    .reduce((sum, t) => sum + t.credit - t.debit, 0)
+
+  // Recalculer le solde pour les transactions filtrées en partant du solde initial
+  let soldeCumule = soldeInitial
   const transactionsFiltreesAvecSolde = transactionsFiltrees.map(t => {
     soldeCumule += t.credit - t.debit
     return { ...t, solde: soldeCumule }
@@ -264,10 +284,24 @@ export default function TresoreriePage() {
       </Card>
 
       {/* Indicateurs principaux */}
-      <div className="grid gap-8 md:grid-cols-3">
+      <div className="grid gap-8 md:grid-cols-4">
+        {soldeInitial !== 0 && (
+          <Card className="transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+            <CardHeader className="pb-4">
+              <CardDescription className="text-xs uppercase tracking-wide font-medium">Solde de Début</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <div className={`text-4xl font-bold tracking-tighter ${soldeInitial >= 0 ? 'text-[hsl(var(--chart-2))]' : 'text-destructive'}`}>
+                {soldeInitial >= 0 ? '+' : ''}{formatMontant(soldeInitial)} €
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Report période précédente</p>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="border-2 border-primary/20 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
           <CardHeader className="pb-4">
-            <CardDescription className="text-xs uppercase tracking-wide font-medium">Solde Actuel</CardDescription>
+            <CardDescription className="text-xs uppercase tracking-wide font-medium">Solde de Fin</CardDescription>
           </CardHeader>
           <CardContent className="pt-2">
             <div className={`text-5xl font-bold tracking-tighter ${soldeActuel >= 0 ? 'text-[hsl(var(--chart-2))]' : 'text-destructive'}`}>
