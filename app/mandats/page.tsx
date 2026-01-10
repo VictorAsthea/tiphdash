@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { AlertCircle, Loader2 } from 'lucide-react'
 
 type Mandat = {
   id: string
@@ -54,6 +55,9 @@ export default function MandatsPage() {
   const [expandedMandatId, setExpandedMandatId] = useState<string | null>(null)
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // États pour la recherche et les filtres
   const [searchTerm, setSearchTerm] = useState('')
@@ -92,55 +96,72 @@ export default function MandatsPage() {
   }, [])
 
   const loadData = async () => {
-    const { data: mandatsData, error } = await supabase
-      .from('mandats')
-      .select('*')
-      .order('date_signature', { ascending: false })
+    setIsLoading(true)
+    setError(null)
 
-    if (error) {
-      console.error('Erreur chargement mandats:', error)
-      return
-    }
+    try {
+      const { data: mandatsData, error: mandatsError } = await supabase
+        .from('mandats')
+        .select('*')
+        .order('date_signature', { ascending: false })
 
-    if (mandatsData) {
-      // Charger les taux actuels pour recalculer les mandats en_cours et potentiel
-      const { data: configData } = await supabase
-        .from('config')
-        .select('key, value')
-
-      const config: Record<string, number> = {}
-      if (configData) {
-        configData.forEach(item => {
-          config[item.key] = item.value
-        })
+      if (mandatsError) {
+        console.error('Erreur chargement mandats:', mandatsError)
+        setError('Erreur lors du chargement des mandats')
+        return
       }
 
-      const tauxTVA = config['taux_tva'] || 20
-      const tauxURSSAF = config['taux_urssaf_pl'] || 26.8
+      if (mandatsData) {
+        // Charger les taux actuels pour recalculer les mandats en_cours et potentiel
+        const { data: configData, error: configError } = await supabase
+          .from('config')
+          .select('key, value')
 
-      // Recalculer les commissions pour les mandats en_cours et potentiel
-      const mandatsRecalcules = mandatsData.map(mandat => {
-        // Si le mandat est vendu, utiliser les taux figés
-        if (mandat.statut === 'vendu' && mandat.taux_tva_fige && mandat.taux_urssaf_fige) {
-          return mandat
+        if (configError) {
+          console.error('Erreur chargement config:', configError)
+          setError('Erreur lors du chargement de la configuration')
+          return
         }
 
-        // Sinon, recalculer avec les taux actuels
-        const tva = mandat.honoraires_moi_ht * (tauxTVA / 100)
-        const commissionTTC = mandat.honoraires_moi_ht + tva
-        const urssaf = mandat.honoraires_moi_ht * (tauxURSSAF / 100)
-        const commissionNette = mandat.honoraires_moi_ht - urssaf
-
-        return {
-          ...mandat,
-          tva,
-          commission_ttc: commissionTTC,
-          urssaf,
-          commission_nette: commissionNette,
+        const config: Record<string, number> = {}
+        if (configData) {
+          configData.forEach(item => {
+            config[item.key] = item.value
+          })
         }
-      })
 
-      setMandats(mandatsRecalcules)
+        const tauxTVA = config['taux_tva'] || 20
+        const tauxURSSAF = config['taux_urssaf_pl'] || 26.8
+
+        // Recalculer les commissions pour les mandats en_cours et potentiel
+        const mandatsRecalcules = mandatsData.map(mandat => {
+          // Si le mandat est vendu, utiliser les taux figés
+          if (mandat.statut === 'vendu' && mandat.taux_tva_fige && mandat.taux_urssaf_fige) {
+            return mandat
+          }
+
+          // Sinon, recalculer avec les taux actuels
+          const tva = mandat.honoraires_moi_ht * (tauxTVA / 100)
+          const commissionTTC = mandat.honoraires_moi_ht + tva
+          const urssaf = mandat.honoraires_moi_ht * (tauxURSSAF / 100)
+          const commissionNette = mandat.honoraires_moi_ht - urssaf
+
+          return {
+            ...mandat,
+            tva,
+            commission_ttc: commissionTTC,
+            urssaf,
+            commission_nette: commissionNette,
+          }
+        })
+
+        setMandats(mandatsRecalcules)
+      }
+    } catch (err) {
+      console.error('Erreur inattendue:', err)
+      setError('Une erreur inattendue est survenue')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -177,48 +198,58 @@ export default function MandatsPage() {
   }
 
   const handleSave = async () => {
-    const commissions = await calculateCommissions(formData.honoraires_moi_ht, formData.statut)
+    setIsSaving(true)
+    setError(null)
 
-    const mandatData = {
-      ...formData,
-      ...commissions,
-      numero_mandat: formData.numero_mandat || null,
-      vendeur: formData.vendeur || null,
-      bien: formData.bien || null,
-      adresse: formData.adresse || null,
-      date_signature: formData.date_signature || null,
-      acquireur: formData.acquireur || null,
-      date_compromis: formData.date_compromis || null,
-      date_reiteration_prevue: formData.date_reiteration_prevue || null,
-    }
+    try {
+      const commissions = await calculateCommissions(formData.honoraires_moi_ht, formData.statut)
 
-    if (editingId) {
-      const { error } = await supabase
-        .from('mandats')
-        .update(mandatData)
-        .eq('id', editingId)
-
-      if (error) {
-        console.error('Erreur mise à jour:', error)
-        alert(`Erreur: ${error.message}`)
-        return
+      const mandatData = {
+        ...formData,
+        ...commissions,
+        numero_mandat: formData.numero_mandat || null,
+        vendeur: formData.vendeur || null,
+        bien: formData.bien || null,
+        adresse: formData.adresse || null,
+        date_signature: formData.date_signature || null,
+        acquireur: formData.acquireur || null,
+        date_compromis: formData.date_compromis || null,
+        date_reiteration_prevue: formData.date_reiteration_prevue || null,
       }
-    } else {
-      const { error } = await supabase
-        .from('mandats')
-        .insert([mandatData])
 
-      if (error) {
-        console.error('Erreur insertion:', error)
-        alert(`Erreur: ${error.message}`)
-        return
+      if (editingId) {
+        const { error } = await supabase
+          .from('mandats')
+          .update(mandatData)
+          .eq('id', editingId)
+
+        if (error) {
+          console.error('Erreur mise à jour:', error)
+          setError(`Erreur lors de la mise à jour: ${error.message}`)
+          return
+        }
+      } else {
+        const { error } = await supabase
+          .from('mandats')
+          .insert([mandatData])
+
+        if (error) {
+          console.error('Erreur insertion:', error)
+          setError(`Erreur lors de l'ajout: ${error.message}`)
+          return
+        }
       }
-    }
 
-    setIsAdding(false)
-    setEditingId(null)
-    resetForm()
-    loadData()
+      setIsAdding(false)
+      setEditingId(null)
+      resetForm()
+      loadData()
+    } catch (err) {
+      console.error('Erreur inattendue:', err)
+      setError('Une erreur inattendue est survenue')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleEdit = (mandat: Mandat) => {
@@ -242,21 +273,45 @@ export default function MandatsPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce mandat ?')) {
-      await supabase
-        .from('mandats')
-        .delete()
-        .eq('id', id)
-      loadData()
+      try {
+        const { error } = await supabase
+          .from('mandats')
+          .delete()
+          .eq('id', id)
+
+        if (error) {
+          console.error('Erreur suppression:', error)
+          setError(`Erreur lors de la suppression: ${error.message}`)
+          return
+        }
+
+        loadData()
+      } catch (err) {
+        console.error('Erreur inattendue:', err)
+        setError('Une erreur inattendue est survenue')
+      }
     }
   }
 
   const handleValiderVente = async (mandat: Mandat) => {
     if (confirm('Valider la vente de ce mandat ?')) {
-      await supabase
-        .from('mandats')
-        .update({ statut: 'vendu' })
-        .eq('id', mandat.id)
-      loadData()
+      try {
+        const { error } = await supabase
+          .from('mandats')
+          .update({ statut: 'vendu' })
+          .eq('id', mandat.id)
+
+        if (error) {
+          console.error('Erreur validation vente:', error)
+          setError(`Erreur lors de la validation: ${error.message}`)
+          return
+        }
+
+        loadData()
+      } catch (err) {
+        console.error('Erreur inattendue:', err)
+        setError('Une erreur inattendue est survenue')
+      }
     }
   }
 
@@ -399,6 +454,26 @@ export default function MandatsPage() {
     m.statut === 'en_cours' && isDateReitProche(m.date_reiteration_prevue)
   )
 
+  if (isLoading) {
+    return (
+      <div className="space-y-10">
+        <div className="relative overflow-hidden rounded-xl p-8 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border border-primary/10">
+          <h1 className="text-5xl font-bold tracking-tight text-primary">Gestion des Mandats</h1>
+          <p className="text-muted-foreground mt-1">Chargement...</p>
+        </div>
+        <Card className="animate-pulse">
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-12 bg-muted rounded"></div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-10">
       <div className="flex justify-between items-center gap-4">
@@ -413,6 +488,23 @@ export default function MandatsPage() {
           <Button onClick={() => setIsAdding(true)} className="transition-all duration-200 active:scale-95">Ajouter un mandat</Button>
         </div>
       </div>
+
+      {/* Message d'erreur */}
+      {error && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <div className="flex-1">
+                <p className="font-medium text-destructive">{error}</p>
+              </div>
+              <Button onClick={() => setError(null)} variant="ghost" size="sm">
+                Fermer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Alertes */}
       {alertesReiteration.length > 0 && (
@@ -625,7 +717,16 @@ export default function MandatsPage() {
             </div>
 
             <div className="flex gap-2 mt-6">
-              <Button onClick={handleSave} className="transition-all duration-200 active:scale-95">Enregistrer</Button>
+              <Button onClick={handleSave} disabled={isSaving} className="transition-all duration-200 active:scale-95">
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Enregistrement...
+                  </>
+                ) : (
+                  'Enregistrer'
+                )}
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => {
@@ -633,6 +734,7 @@ export default function MandatsPage() {
                   setEditingId(null)
                   resetForm()
                 }}
+                disabled={isSaving}
                 className="transition-all duration-200 active:scale-95"
               >
                 Annuler
