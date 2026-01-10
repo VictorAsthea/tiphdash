@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { AlertCircle, Loader2 } from 'lucide-react'
 
 type Transaction = {
   id: string
@@ -38,6 +39,9 @@ export default function TresoreriePage() {
   const [typeOperation, setTypeOperation] = useState<'credit' | 'debit'>('credit')
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString())
   const [selectedMonth, setSelectedMonth] = useState<string>('tous')
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     date_operation: new Date().toISOString().split('T')[0],
     montant: 0,
@@ -49,63 +53,87 @@ export default function TresoreriePage() {
   }, [])
 
   const loadData = async () => {
-    const { data, error } = await supabase
-      .from('tresorerie')
-      .select('*')
-      .order('date_operation', { ascending: true })
-      .order('created_at', { ascending: true })
+    setIsLoading(true)
+    setError(null)
 
-    if (error) {
-      console.error('Erreur chargement trésorerie:', error)
-    } else if (data) {
-      // Calculer le solde cumulé pour chaque transaction
-      let soldeActuel = 0
-      const transactionsAvecSolde = data.map((transaction) => {
-        soldeActuel += transaction.credit - transaction.debit
-        return {
-          ...transaction,
-          solde: soldeActuel,
-        }
-      })
-      setTransactions(transactionsAvecSolde)
+    try {
+      const { data, error: loadError } = await supabase
+        .from('tresorerie')
+        .select('*')
+        .order('date_operation', { ascending: true })
+        .order('created_at', { ascending: true })
+
+      if (loadError) {
+        console.error('Erreur chargement trésorerie:', loadError)
+        setError('Erreur lors du chargement des transactions')
+        return
+      }
+
+      if (data) {
+        // Calculer le solde cumulé pour chaque transaction
+        let soldeActuel = 0
+        const transactionsAvecSolde = data.map((transaction) => {
+          soldeActuel += transaction.credit - transaction.debit
+          return {
+            ...transaction,
+            solde: soldeActuel,
+          }
+        })
+        setTransactions(transactionsAvecSolde)
+      }
+    } catch (err) {
+      console.error('Erreur inattendue:', err)
+      setError('Une erreur inattendue est survenue')
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const handleSave = async () => {
-    const transactionData = {
-      date_operation: formData.date_operation,
-      debit: typeOperation === 'debit' ? formData.montant : 0,
-      credit: typeOperation === 'credit' ? formData.montant : 0,
-      info_transaction: formData.info_transaction,
-    }
+    setIsSaving(true)
+    setError(null)
 
-    if (editingId) {
-      const { error } = await supabase
-        .from('tresorerie')
-        .update(transactionData)
-        .eq('id', editingId)
-
-      if (error) {
-        console.error('Erreur mise à jour:', error)
-        alert(`Erreur: ${error.message}`)
-        return
+    try {
+      const transactionData = {
+        date_operation: formData.date_operation,
+        debit: typeOperation === 'debit' ? formData.montant : 0,
+        credit: typeOperation === 'credit' ? formData.montant : 0,
+        info_transaction: formData.info_transaction,
       }
-    } else {
-      const { error } = await supabase
-        .from('tresorerie')
-        .insert([transactionData])
 
-      if (error) {
-        console.error('Erreur insertion:', error)
-        alert(`Erreur: ${error.message}`)
-        return
+      if (editingId) {
+        const { error: updateError } = await supabase
+          .from('tresorerie')
+          .update(transactionData)
+          .eq('id', editingId)
+
+        if (updateError) {
+          console.error('Erreur mise à jour:', updateError)
+          setError(`Erreur lors de la mise à jour: ${updateError.message}`)
+          return
+        }
+      } else {
+        const { error: insertError } = await supabase
+          .from('tresorerie')
+          .insert([transactionData])
+
+        if (insertError) {
+          console.error('Erreur insertion:', insertError)
+          setError(`Erreur lors de l'ajout: ${insertError.message}`)
+          return
+        }
       }
-    }
 
-    setIsAdding(false)
-    setEditingId(null)
-    resetForm()
-    loadData()
+      setIsAdding(false)
+      setEditingId(null)
+      resetForm()
+      loadData()
+    } catch (err) {
+      console.error('Erreur inattendue:', err)
+      setError('Une erreur inattendue est survenue')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleEdit = (transaction: Transaction) => {
@@ -122,11 +150,23 @@ export default function TresoreriePage() {
 
   const handleDelete = async (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cette transaction ?')) {
-      await supabase
-        .from('tresorerie')
-        .delete()
-        .eq('id', id)
-      loadData()
+      try {
+        const { error: deleteError } = await supabase
+          .from('tresorerie')
+          .delete()
+          .eq('id', id)
+
+        if (deleteError) {
+          console.error('Erreur suppression:', deleteError)
+          setError(`Erreur lors de la suppression: ${deleteError.message}`)
+          return
+        }
+
+        loadData()
+      } catch (err) {
+        console.error('Erreur inattendue:', err)
+        setError('Une erreur inattendue est survenue')
+      }
     }
   }
 
@@ -218,6 +258,29 @@ export default function TresoreriePage() {
   const totalCredits = transactionsFiltreesAvecSolde.reduce((sum, t) => sum + t.credit, 0)
   const totalDebits = transactionsFiltreesAvecSolde.reduce((sum, t) => sum + t.debit, 0)
 
+  if (isLoading) {
+    return (
+      <div className="space-y-10">
+        <div className="relative overflow-hidden rounded-xl p-8 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border border-primary/10">
+          <h1 className="text-5xl font-bold tracking-tight text-primary">Trésorerie</h1>
+          <p className="text-muted-foreground mt-1">Chargement...</p>
+        </div>
+        <div className="grid gap-8 md:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader className="pb-4">
+                <div className="h-4 bg-muted rounded w-24"></div>
+              </CardHeader>
+              <CardContent className="pt-2">
+                <div className="h-10 bg-muted rounded w-32"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-10">
       <div className="flex justify-between items-center gap-4">
@@ -229,6 +292,23 @@ export default function TresoreriePage() {
           + Nouvelle transaction
         </Button>
       </div>
+
+      {/* Message d'erreur */}
+      {error && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <div className="flex-1">
+                <p className="font-medium text-destructive">{error}</p>
+              </div>
+              <Button onClick={() => setError(null)} variant="ghost" size="sm">
+                Fermer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filtres */}
       <Card className="transition-all duration-300 hover:shadow-lg">
@@ -396,8 +476,15 @@ export default function TresoreriePage() {
             </div>
 
             <div className="flex gap-2 mt-6">
-              <Button onClick={handleSave} size="lg" className="transition-all duration-200 active:scale-95">
-                {editingId ? 'Mettre à jour' : 'Enregistrer'}
+              <Button onClick={handleSave} size="lg" disabled={isSaving} className="transition-all duration-200 active:scale-95">
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Enregistrement...
+                  </>
+                ) : (
+                  editingId ? 'Mettre à jour' : 'Enregistrer'
+                )}
               </Button>
               <Button
                 variant="outline"
@@ -406,6 +493,7 @@ export default function TresoreriePage() {
                   setEditingId(null)
                   resetForm()
                 }}
+                disabled={isSaving}
                 className="transition-all duration-200 active:scale-95"
               >
                 Annuler

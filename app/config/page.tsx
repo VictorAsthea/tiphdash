@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/lib/use-theme";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 type Config = {
   id: string;
@@ -24,37 +25,97 @@ type Config = {
 export default function ConfigPage() {
   const [configs, setConfigs] = useState<Config[]>([]);
   const [isEditing, setIsEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Record<string, number>>({});
   const { theme, toggleTheme, mounted } = useTheme();
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability
     loadData();
   }, []);
 
   const loadData = async () => {
-    const { data } = await supabase.from("config").select("*").order("key");
+    setIsLoading(true);
+    setError(null);
 
-    if (data) {
-      setConfigs(data);
-      const formMap = data.reduce((acc, item) => {
-        acc[item.key] = item.value;
-        return acc;
-      }, {} as Record<string, number>);
-      setFormData(formMap);
+    try {
+      const { data, error: loadError } = await supabase
+        .from("config")
+        .select("*")
+        .order("key");
+
+      if (loadError) {
+        console.error("Erreur chargement config:", loadError);
+        setError("Erreur lors du chargement de la configuration");
+        return;
+      }
+
+      if (data) {
+        setConfigs(data);
+        const formMap = data.reduce((acc, item) => {
+          acc[item.key] = item.value;
+          return acc;
+        }, {} as Record<string, number>);
+        setFormData(formMap);
+      }
+    } catch (err) {
+      console.error("Erreur inattendue:", err);
+      setError("Une erreur inattendue est survenue");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSave = async () => {
-    for (const config of configs) {
-      await supabase
-        .from("config")
-        .update({ value: formData[config.key] })
-        .eq("key", config.key);
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      for (const config of configs) {
+        const { error: updateError } = await supabase
+          .from("config")
+          .update({ value: formData[config.key] })
+          .eq("key", config.key);
+
+        if (updateError) {
+          console.error("Erreur mise à jour:", updateError);
+          setError(`Erreur lors de la mise à jour: ${updateError.message}`);
+          return;
+        }
+      }
+      setIsEditing(false);
+      loadData();
+    } catch (err) {
+      console.error("Erreur inattendue:", err);
+      setError("Une erreur inattendue est survenue");
+    } finally {
+      setIsSaving(false);
     }
-    setIsEditing(false);
-    loadData();
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-10">
+        <div className="relative overflow-hidden rounded-xl p-8 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border border-primary/10">
+          <h1 className="text-5xl font-bold tracking-tight text-primary">
+            Configuration
+          </h1>
+          <p className="text-muted-foreground mt-1">Chargement...</p>
+        </div>
+        <Card className="animate-pulse">
+          <CardHeader className="pb-4">
+            <div className="h-6 bg-muted rounded w-32"></div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-12 bg-muted rounded"></div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10">
@@ -66,6 +127,23 @@ export default function ConfigPage() {
           Gérez les taux et paramètres de calcul
         </p>
       </div>
+
+      {/* Message d'erreur */}
+      {error && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <div className="flex-1">
+                <p className="font-medium text-destructive">{error}</p>
+              </div>
+              <Button onClick={() => setError(null)} variant="ghost" size="sm">
+                Fermer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="transition-all duration-300 hover:shadow-lg">
         <CardHeader className="pb-4">
@@ -102,13 +180,22 @@ export default function ConfigPage() {
               <div className="flex gap-2 pt-4">
                 <Button
                   onClick={handleSave}
+                  disabled={isSaving}
                   className="transition-all duration-200 active:scale-95"
                 >
-                  Enregistrer
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Enregistrement...
+                    </>
+                  ) : (
+                    "Enregistrer"
+                  )}
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => setIsEditing(false)}
+                  disabled={isSaving}
                   className="transition-all duration-200 active:scale-95"
                 >
                   Annuler

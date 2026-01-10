@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { ChartSkeleton } from '@/components/charts/chart-skeleton'
+import { AlertCircle } from 'lucide-react'
 
 // Lazy loading des graphiques pour performance
 const MonthlyChart = dynamic(
@@ -42,6 +43,8 @@ export default function DashboardPage() {
   const [projection, setProjection] = useState<ProjectionCA | null>(null)
   const [mandats, setMandats] = useState<Mandat[]>([])
   const [isEditingObjectif, setIsEditingObjectif] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     year: new Date().getFullYear(),
     objectif: 0,
@@ -52,72 +55,121 @@ export default function DashboardPage() {
   }, [])
 
   const loadData = async () => {
-    const currentYear = new Date().getFullYear()
+    setIsLoading(true)
+    setError(null)
 
-    // Charger la projection de l'année en cours
-    const { data: projectionData } = await supabase
-      .from('projections_ca')
-      .select('*')
-      .eq('year', currentYear)
-      .single()
+    try {
+      const currentYear = new Date().getFullYear()
 
-    if (projectionData) {
-      setProjection(projectionData)
-      setFormData({
-        year: projectionData.year,
-        objectif: projectionData.objectif,
-      })
-    }
+      // Charger la projection de l'année en cours
+      const { data: projectionData, error: projectionError } = await supabase
+        .from('projections_ca')
+        .select('*')
+        .eq('year', currentYear)
+        .single()
 
-    // Charger les mandats
-    const { data: mandatsData } = await supabase
-      .from('mandats')
-      .select('id, statut, honoraires_moi_ht, commission_nette, taux_tva_fige, taux_urssaf_fige, date_signature, date_compromis')
+      // PGRST116 = pas de résultat (normal si pas encore de projection)
+      if (projectionError && projectionError.code !== 'PGRST116') {
+        console.error('Erreur chargement projection:', projectionError)
+        setError('Erreur lors du chargement des projections')
+        setIsLoading(false)
+        return
+      }
 
-    if (mandatsData) {
-      // Charger les taux actuels pour recalculer les mandats en_cours et potentiel
-      const { data: configData } = await supabase
-        .from('config')
-        .select('key, value')
-
-      const config: Record<string, number> = {}
-      if (configData) {
-        configData.forEach(item => {
-          config[item.key] = item.value
+      if (projectionData) {
+        setProjection(projectionData)
+        setFormData({
+          year: projectionData.year,
+          objectif: projectionData.objectif,
         })
       }
 
-      const tauxURSSAF = config['taux_urssaf_pl'] || 26.8
+      // Charger les mandats
+      const { data: mandatsData, error: mandatsError } = await supabase
+        .from('mandats')
+        .select('id, statut, honoraires_moi_ht, commission_nette, taux_tva_fige, taux_urssaf_fige, date_signature, date_compromis')
 
-      // Recalculer TOUTES les commissions avec le taux URSSAF actuel pour l'affichage
-      // (les valeurs en base gardent les taux figés pour l'historique)
-      const mandatsRecalcules = mandatsData.map(mandat => {
-        const urssaf = mandat.honoraires_moi_ht * (tauxURSSAF / 100)
-        const commissionNette = mandat.honoraires_moi_ht - urssaf
+      if (mandatsError) {
+        console.error('Erreur chargement mandats:', mandatsError)
+        setError('Erreur lors du chargement des mandats')
+        setIsLoading(false)
+        return
+      }
 
-        return {
-          ...mandat,
-          commission_nette: commissionNette,
+      if (mandatsData) {
+        // Charger les taux actuels pour recalculer les mandats en_cours et potentiel
+        const { data: configData, error: configError } = await supabase
+          .from('config')
+          .select('key, value')
+
+        if (configError) {
+          console.error('Erreur chargement config:', configError)
+          setError('Erreur lors du chargement de la configuration')
+          setIsLoading(false)
+          return
         }
-      })
 
-      setMandats(mandatsRecalcules)
+        const config: Record<string, number> = {}
+        if (configData) {
+          configData.forEach(item => {
+            config[item.key] = item.value
+          })
+        }
+
+        const tauxURSSAF = config['taux_urssaf_pl'] || 26.8
+
+        // Recalculer TOUTES les commissions avec le taux URSSAF actuel pour l'affichage
+        // (les valeurs en base gardent les taux figés pour l'historique)
+        const mandatsRecalcules = mandatsData.map(mandat => {
+          const urssaf = mandat.honoraires_moi_ht * (tauxURSSAF / 100)
+          const commissionNette = mandat.honoraires_moi_ht - urssaf
+
+          return {
+            ...mandat,
+            commission_nette: commissionNette,
+          }
+        })
+
+        setMandats(mandatsRecalcules)
+      }
+    } catch (err) {
+      console.error('Erreur inattendue:', err)
+      setError('Une erreur inattendue est survenue')
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const handleSaveObjectif = async () => {
-    if (projection) {
-      await supabase
-        .from('projections_ca')
-        .update({ objectif: formData.objectif })
-        .eq('id', projection.id)
-    } else {
-      await supabase
-        .from('projections_ca')
-        .insert([formData])
+    try {
+      if (projection) {
+        const { error } = await supabase
+          .from('projections_ca')
+          .update({ objectif: formData.objectif })
+          .eq('id', projection.id)
+
+        if (error) {
+          console.error('Erreur mise à jour objectif:', error)
+          setError('Erreur lors de la mise à jour de l\'objectif')
+          return
+        }
+      } else {
+        const { error } = await supabase
+          .from('projections_ca')
+          .insert([formData])
+
+        if (error) {
+          console.error('Erreur création objectif:', error)
+          setError('Erreur lors de la création de l\'objectif')
+          return
+        }
+      }
+      setIsEditingObjectif(false)
+      loadData()
+    } catch (err) {
+      console.error('Erreur inattendue:', err)
+      setError('Une erreur inattendue est survenue')
     }
-    setIsEditingObjectif(false)
-    loadData()
   }
 
   // Mémoization des statistiques pour optimiser les performances
@@ -214,6 +266,57 @@ export default function DashboardPage() {
       'Potentiel': Math.round(stats.caPotentiel),
     }
   ], [projection, stats.caBrut, stats.caPotentiel])
+
+  if (isLoading) {
+    return (
+      <div className="space-y-10">
+        <div className="relative overflow-hidden rounded-xl p-8 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border border-primary/10">
+          <h1 className="text-5xl font-bold tracking-tight text-primary">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Chargement...</p>
+        </div>
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader className="pb-4">
+                <div className="h-4 bg-muted rounded w-24"></div>
+              </CardHeader>
+              <CardContent className="pt-2">
+                <div className="h-12 bg-muted rounded w-16"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="grid gap-8 lg:grid-cols-2">
+          <ChartSkeleton />
+          <ChartSkeleton />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-10">
+        <div className="relative overflow-hidden rounded-xl p-8 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border border-primary/10">
+          <h1 className="text-5xl font-bold tracking-tight text-primary">Dashboard</h1>
+        </div>
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <div>
+                <p className="font-medium text-destructive">{error}</p>
+                <p className="text-sm text-muted-foreground mt-1">Vérifiez votre connexion et réessayez.</p>
+              </div>
+            </div>
+            <Button onClick={loadData} variant="outline" className="mt-4">
+              Réessayer
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-10">
